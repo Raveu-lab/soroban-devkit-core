@@ -37,6 +37,7 @@ export class EventDecoder {
 
   /**
    * Decode an array of base64 XDR topic strings into plain values.
+   * Returns "[decode error]" for any topic that cannot be decoded.
    */
   decodeTopics(topics: string[]): unknown[] {
     return topics.map((topic) => this.decodeBase64ScVal(topic));
