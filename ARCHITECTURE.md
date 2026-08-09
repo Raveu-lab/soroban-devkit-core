@@ -209,7 +209,7 @@ User callback: (event: ContractEvent) => void
 | Package | Why |
 |---------|-----|
 | `@stellar/stellar-sdk` | Core Stellar/Soroban primitives — XDR, RPC client, transaction builder |
-| `axios` | HTTP fallback for environments where fetch is unavailable |
+| `axios` | HTTP fallback for environments where `fetch` is unavailable (peer dependency of `@stellar/stellar-sdk`) |
 
 No framework dependencies. No build plugins. TypeScript compiled to CommonJS via `tsc`.
 
@@ -218,7 +218,7 @@ No framework dependencies. No build plugins. TypeScript compiled to CommonJS via
 ## Testing Strategy
 
 - **Unit tests** — `EventDecoder` and `BindingGenerator` are tested with mocked XDR fixtures
-- **Integration tests** — `ContractSimulator` and `ContractMonitor` are tested against testnet using the contracts in `soroban-devkit-contracts`
+- **Integration tests** — `ContractSimulator` and `ContractMonitor` are tested against testnet using the contracts in `soroban-devkit-contract`
 - **No mocking of the Stellar SDK** — we test against real XDR to catch encoding regressions early
 
 Test runner: Jest with `ts-jest`.
