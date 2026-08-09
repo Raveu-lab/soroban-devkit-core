@@ -86,3 +86,64 @@ describe("ContractSimulator", () => {
     }, 15000);
   });
 });
+
+describe("ContractSimulator — additional edge cases", () => {
+  describe("buildTransaction", () => {
+    it("uses BASE_FEE as the transaction fee", () => {
+      const sim = new ContractSimulator("testnet");
+      const tx = sim.buildTransaction(
+        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+        "ping",
+        [],
+        "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+        "0"
+      );
+      expect(Number(tx.fee)).toBeGreaterThan(0);
+    });
+
+    it("builds transaction with correct sequence number", () => {
+      const sim = new ContractSimulator("testnet");
+      const tx = sim.buildTransaction(
+        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+        "ping",
+        [],
+        "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+        "42"
+      );
+      // sequence number in transaction is incremented by 1
+      expect(tx.sequence).toBe("43");
+    });
+
+    it("accepts xdr.ScVal args and includes them in the operation", () => {
+      const sim = new ContractSimulator("testnet");
+      const args = [xdr.ScVal.scvU32(100), xdr.ScVal.scvBool(true)];
+      const tx = sim.buildTransaction(
+        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+        "my_method",
+        args,
+        "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+        "0"
+      );
+      expect(tx.operations).toHaveLength(1);
+    });
+  });
+
+  describe("normalizeSimulationError", () => {
+    it("always sets success to false", () => {
+      const sim = new ContractSimulator("testnet");
+      expect(sim.normalizeSimulationError("any error").success).toBe(false);
+    });
+
+    it("preserves the exact error message", () => {
+      const sim = new ContractSimulator("testnet");
+      const msg = "Contract data needs restoration";
+      expect(sim.normalizeSimulationError(msg).error).toBe(msg);
+    });
+
+    it("returns zero footprint values", () => {
+      const sim = new ContractSimulator("testnet");
+      const result = sim.normalizeSimulationError("err");
+      expect(result.footprint).toEqual({ readBytes: 0, writeBytes: 0, instructions: 0 });
+    });
+  });
+});
