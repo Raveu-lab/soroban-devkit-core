@@ -118,3 +118,89 @@ describe("ContractMonitor", () => {
     });
   });
 });
+
+describe("ContractMonitor — additional edge cases", () => {
+  describe("watch", () => {
+    it("overwrites previous options when called again", () => {
+      const monitor = new ContractMonitor("testnet");
+      monitor.watch({ contractIds: ["CFIRST"], pollingIntervalMs: 1000 });
+      monitor.watch({ contractIds: ["CSECOND"], pollingIntervalMs: 2000 });
+      expect(monitor.getOptions().contractIds).toEqual(["CSECOND"]);
+      expect(monitor.getOptions().pollingIntervalMs).toBe(2000);
+    });
+
+    it("accepts empty contractIds array", () => {
+      const monitor = new ContractMonitor("testnet");
+      monitor.watch({ contractIds: [] });
+      expect(monitor.getOptions().contractIds).toEqual([]);
+    });
+  });
+
+  describe("buildEventFilters", () => {
+    it("returns empty filters when contractIds is an empty array", () => {
+      const monitor = new ContractMonitor("testnet");
+      monitor.watch({ contractIds: [] });
+      expect(monitor.buildEventFilters()).toEqual([]);
+    });
+
+    it("sets filter type to contract", () => {
+      const monitor = new ContractMonitor("testnet");
+      monitor.watch({ contractIds: ["CABC"] });
+      const filters = monitor.buildEventFilters();
+      expect(filters[0].type).toBe("contract");
+    });
+  });
+
+  describe("on", () => {
+    it("allows multiple event callbacks", () => {
+      const monitor = new ContractMonitor("testnet");
+      monitor.on("event", () => {});
+      monitor.on("event", () => {});
+      expect(monitor.getEventCallbackCount()).toBe(2);
+    });
+
+    it("allows multiple error callbacks", () => {
+      const monitor = new ContractMonitor("testnet");
+      monitor.on("error", () => {});
+      monitor.on("error", () => {});
+      expect(monitor.getErrorCallbackCount()).toBe(2);
+    });
+  });
+
+  describe("normalizeRawEvent", () => {
+    it("sets event type from raw type string", () => {
+      const monitor = new ContractMonitor("testnet");
+      monitor.watch({});
+      const raw = {
+        ledger: 1,
+        ledgerClosedAt: "",
+        contractId: "CTEST",
+        id: "x",
+        type: "diagnostic",
+        topic: [],
+        value: { toXDR: (_: string) => "" },
+      };
+      const event = monitor.normalizeRawEvent(raw as never);
+      expect(event.type).toBe("diagnostic");
+    });
+
+    it("maps all topics to base64 strings", () => {
+      const monitor = new ContractMonitor("testnet");
+      monitor.watch({});
+      const raw = {
+        ledger: 1,
+        ledgerClosedAt: "",
+        contractId: "CTEST",
+        id: "x",
+        type: "contract",
+        topic: [
+          { toXDR: (_: string) => "TOPIC1" },
+          { toXDR: (_: string) => "TOPIC2" },
+        ],
+        value: { toXDR: (_: string) => "" },
+      };
+      const event = monitor.normalizeRawEvent(raw as never);
+      expect(event.topics).toEqual(["TOPIC1", "TOPIC2"]);
+    });
+  });
+});
