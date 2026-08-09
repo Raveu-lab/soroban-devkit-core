@@ -12,7 +12,7 @@ This project is part of the **Stellar Wave Program** on [Drips](https://drips.ne
 ### Setup
 
 ```bash
-git clone https://github.com/soroban-devkit/soroban-devkit-core
+git clone https://github.com/Raveu-lab/soroban-devkit-core
 cd soroban-devkit-core
 npm install
 npm run build
@@ -21,7 +21,7 @@ npm test
 
 ## Picking Up an Issue
 
-1. Browse [open issues](https://github.com/soroban-devkit/soroban-devkit-core/issues)
+1. Browse [open issues](https://github.com/Raveu-lab/soroban-devkit-core/issues)
 2. Issues tagged `good first issue` are beginner-friendly
 3. Comment on the issue to claim it before starting work
 4. One issue per contributor at a time
@@ -59,4 +59,4 @@ npm run format
 
 ## Questions
 
-Open a [GitHub Discussion](https://github.com/soroban-devkit/soroban-devkit-core/discussions) for questions that aren't bug reports or feature requests.
+Open a [GitHub Discussion](https://github.com/Raveu-lab/soroban-devkit-core/discussions) for questions that aren't bug reports or feature requests.

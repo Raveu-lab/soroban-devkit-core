@@ -36,7 +36,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/soroban-devkit/soroban-devkit-core.git"
+    "url": "https://github.com/Raveu-lab/soroban-devkit-core.git"
   },
   "keywords": [
     "stellar",
