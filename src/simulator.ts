@@ -66,7 +66,13 @@ export class ContractSimulator {
 
   /**
    * Build a Soroban transaction for the given contract call.
-   * Public so it can be tested in isolation without a network call.
+   * Public so it can be unit-tested in isolation without a network call.
+   *
+   * @param contractId      - The contract address in C... format
+   * @param method          - The function name to invoke
+   * @param args            - XDR ScVal arguments
+   * @param callerPublicKey - The caller's public key in G... format
+   * @param sequenceNumber  - Current sequence number for the caller account
    */
   buildTransaction(
     contractId: string,
