@@ -182,3 +182,56 @@ describe("EventDecoder", () => {
     });
   });
 });
+
+describe("EventDecoder — additional edge cases", () => {
+  let decoder: EventDecoder;
+
+  beforeEach(() => {
+    decoder = new EventDecoder();
+  });
+
+  it("decodes scvBytes as a lowercase hex string", () => {
+    const bytes = Buffer.from([0xde, 0xad, 0xbe, 0xef]);
+    const xdrVal = xdr.ScVal.scvBytes(bytes).toXDR("base64");
+    const event = makeEvent([], xdrVal);
+    expect(decoder.decode(event).decodedData).toBe("deadbeef");
+  });
+
+  it("decodes a vec of symbols", () => {
+    const vec = makeVecXdr([
+      xdr.ScVal.scvSymbol("alpha"),
+      xdr.ScVal.scvSymbol("beta"),
+    ]);
+    const event = makeEvent([], vec);
+    expect(decoder.decode(event).decodedData).toEqual(["alpha", "beta"]);
+  });
+
+  it("decodes an empty vec as an empty array", () => {
+    const vec = xdr.ScVal.scvVec([]).toXDR("base64");
+    const event = makeEvent([], vec);
+    expect(decoder.decode(event).decodedData).toEqual([]);
+  });
+
+  it("decodes a nested map with mixed value types", () => {
+    const map = makeMapXdr([
+      ["count", xdr.ScVal.scvU32(5)],
+      ["label", xdr.ScVal.scvSymbol("active")],
+      ["enabled", xdr.ScVal.scvBool(true)],
+    ]);
+    const event = makeEvent([], map);
+    expect(decoder.decode(event).decodedData).toEqual({
+      count: 5,
+      label: "active",
+      enabled: true,
+    });
+  });
+
+  it("decodes multiple topics of different types", () => {
+    const event = makeEvent(
+      [makeSymbolXdr("burn"), makeU32Xdr(999), makeBoolXdr(false)],
+      makeVoidXdr()
+    );
+    const result = decoder.decode(event);
+    expect(result.decodedTopics).toEqual(["burn", 999, false]);
+  });
+});
