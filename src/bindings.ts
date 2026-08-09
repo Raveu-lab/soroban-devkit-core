@@ -37,11 +37,13 @@ export class BindingGenerator {
    * Full WASM spec parsing is a contributor task — see GitHub issue #15.
    */
   async generate(): Promise<string> {
+    const contractAddress = xdr.ScAddress.scAddressTypeContract(
+      Buffer.from(this.options.contractId, "hex")
+    );
+
     const contractCodeKey = xdr.LedgerKey.contractData(
       new xdr.LedgerKeyContractData({
-        contract: xdr.ScAddress.scAddressTypeContract({
-          contractId: Buffer.from(this.options.contractId, "hex"),
-        }),
+        contract: contractAddress,
         key: xdr.ScVal.scvLedgerKeyContractInstance(),
         durability: xdr.ContractDataDurability.persistent(),
       })

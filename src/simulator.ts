@@ -1,6 +1,7 @@
 import {
   Contract,
   SorobanRpc,
+  Transaction,
   TransactionBuilder,
   Account,
   BASE_FEE,
@@ -12,21 +13,18 @@ import { NetworkConfig, SimulationResult, NETWORK_CONFIGS, Network } from "./typ
  * ContractSimulator
  *
  * Simulates Soroban contract function calls without broadcasting to the network.
- * Returns resource footprint and cost estimates useful for gas estimation and
- * pre-flight validation during development.
+ * Single Responsibility: build a transaction, simulate it, normalize the result.
  *
  * @example
  * ```ts
  * const sim = new ContractSimulator("testnet");
- * const result = await sim.simulate(
- *   "CXXXXXX...", "transfer", [fromVal, toVal, amountVal], "GXXXXXX..."
- * );
+ * const result = await sim.simulate("CXXXXX", "transfer", [from, to, amount], "GXXXXX");
  * console.log(result.cost.cpuInstructions);
  * ```
  */
 export class ContractSimulator {
-  private server: SorobanRpc.Server;
-  private config: NetworkConfig;
+  private readonly server: SorobanRpc.Server;
+  private readonly config: NetworkConfig;
 
   constructor(networkOrConfig: Network | NetworkConfig) {
     this.config =
@@ -40,12 +38,8 @@ export class ContractSimulator {
   }
 
   /**
-   * Simulate a contract invocation and return cost + footprint.
-   *
-   * @param contractId - The contract address in C... format
-   * @param method     - The contract function name
-   * @param args       - Array of XDR ScVal arguments
-   * @param caller     - The Stellar account public key in G... format
+   * Simulate a contract invocation and return a normalized SimulationResult.
+   * Never throws — all errors are returned as { success: false, error }.
    */
   async simulate(
     contractId: string,
@@ -54,66 +48,102 @@ export class ContractSimulator {
     caller: string
   ): Promise<SimulationResult> {
     try {
-      const account = await this.server.getAccount(caller);
-      const txAccount = new Account(account.id, account.sequenceNumber());
-
-      const contract = new Contract(contractId);
-      const tx = new TransactionBuilder(txAccount, {
-        fee: BASE_FEE,
-        networkPassphrase: this.config.networkPassphrase,
-      })
-        .addOperation(contract.call(method, ...args))
-        .setTimeout(30)
-        .build();
-
-      const simResponse = await this.server.simulateTransaction(tx);
-
-      if (SorobanRpc.Api.isSimulationError(simResponse)) {
-        return {
-          success: false,
-          error: simResponse.error,
-          footprint: { readBytes: 0, writeBytes: 0, instructions: 0 },
-          cost: { cpuInstructions: "0", memoryBytes: "0" },
-        };
-      }
-
-      if (SorobanRpc.Api.isSimulationRestore(simResponse)) {
-        return {
-          success: false,
-          error: "Contract data needs restoration before this call can succeed. Run `sdev restore`.",
-          footprint: { readBytes: 0, writeBytes: 0, instructions: 0 },
-          cost: { cpuInstructions: "0", memoryBytes: "0" },
-          rawResult: simResponse,
-        };
-      }
-
-      const success = simResponse as SorobanRpc.Api.SimulateTransactionSuccessResponse;
-
-      return {
-        success: true,
-        returnValue: success.result?.retval
-          ? xdr.ScVal.fromXDR(success.result.retval.toXDR())
-          : undefined,
-        footprint: {
-          readBytes: Number(success.minResourceFee ?? 0),
-          writeBytes: 0,
-          instructions: Number(
-            success.transactionData?.build().resources().instructions() ?? 0
-          ),
-        },
-        cost: {
-          cpuInstructions: success.cost?.cpuInsns?.toString() ?? "0",
-          memoryBytes: success.cost?.memBytes?.toString() ?? "0",
-        },
-        rawResult: success,
-      };
+      const sequenceNumber = await this.fetchSequenceNumber(caller);
+      const tx = this.buildTransaction(contractId, method, args, caller, sequenceNumber);
+      const response = await this.server.simulateTransaction(tx);
+      return this.normalizeResponse(response);
     } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-        footprint: { readBytes: 0, writeBytes: 0, instructions: 0 },
-        cost: { cpuInstructions: "0", memoryBytes: "0" },
-      };
+      return this.normalizeSimulationError(
+        error instanceof Error ? error.message : String(error)
+      );
     }
+  }
+
+  /**
+   * Build a Soroban transaction for the given contract call.
+   * Public so it can be tested in isolation without a network call.
+   */
+  buildTransaction(
+    contractId: string,
+    method: string,
+    args: xdr.ScVal[],
+    callerPublicKey: string,
+    sequenceNumber: string
+  ): Transaction {
+    const account = new Account(callerPublicKey, sequenceNumber);
+    const contract = new Contract(contractId);
+
+    return new TransactionBuilder(account, {
+      fee: BASE_FEE,
+      networkPassphrase: this.config.networkPassphrase,
+    })
+      .addOperation(contract.call(method, ...args))
+      .setTimeout(30)
+      .build();
+  }
+
+  /**
+   * Convert a simulation error message into a failed SimulationResult.
+   * Public so it can be tested in isolation.
+   */
+  normalizeSimulationError(errorMessage: string): SimulationResult {
+    return {
+      success: false,
+      error: errorMessage,
+      footprint: { readBytes: 0, writeBytes: 0, instructions: 0 },
+      cost: { cpuInstructions: "0", memoryBytes: "0" },
+    };
+  }
+
+  /**
+   * Fetch the current sequence number for a Stellar account.
+   */
+  private async fetchSequenceNumber(publicKey: string): Promise<string> {
+    const account = await this.server.getAccount(publicKey);
+    return account.sequenceNumber();
+  }
+
+  /**
+   * Normalize a raw RPC simulation response into a SimulationResult.
+   */
+  private normalizeResponse(
+    response: SorobanRpc.Api.SimulateTransactionResponse
+  ): SimulationResult {
+    if (SorobanRpc.Api.isSimulationError(response)) {
+      return this.normalizeSimulationError(response.error);
+    }
+
+    if (SorobanRpc.Api.isSimulationRestore(response)) {
+      return this.normalizeSimulationError(
+        "Contract data needs restoration before this call can succeed."
+      );
+    }
+
+    return this.normalizeSuccessResponse(
+      response as SorobanRpc.Api.SimulateTransactionSuccessResponse
+    );
+  }
+
+  /**
+   * Normalize a successful simulation response.
+   */
+  private normalizeSuccessResponse(
+    response: SorobanRpc.Api.SimulateTransactionSuccessResponse
+  ): SimulationResult {
+    return {
+      success: true,
+      footprint: {
+        readBytes: Number(response.minResourceFee ?? 0),
+        writeBytes: 0,
+        instructions: Number(
+          response.transactionData?.build().resources().instructions() ?? 0
+        ),
+      },
+      cost: {
+        cpuInstructions: response.cost?.cpuInsns?.toString() ?? "0",
+        memoryBytes: response.cost?.memBytes?.toString() ?? "0",
+      },
+      rawResult: response,
+    };
   }
 }

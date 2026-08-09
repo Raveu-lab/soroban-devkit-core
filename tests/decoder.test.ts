@@ -1,5 +1,60 @@
+import { xdr } from "@stellar/stellar-sdk";
 import { EventDecoder } from "../src/decoder";
 import { ContractEvent } from "../src/types";
+
+/**
+ * Helpers to build real XDR ScVal fixtures
+ */
+function makeSymbolXdr(value: string): string {
+  return xdr.ScVal.scvSymbol(value).toXDR("base64");
+}
+
+function makeBoolXdr(value: boolean): string {
+  return xdr.ScVal.scvBool(value).toXDR("base64");
+}
+
+function makeU32Xdr(value: number): string {
+  return xdr.ScVal.scvU32(value).toXDR("base64");
+}
+
+function makeI32Xdr(value: number): string {
+  return xdr.ScVal.scvI32(value).toXDR("base64");
+}
+
+function makeVoidXdr(): string {
+  return xdr.ScVal.scvVoid().toXDR("base64");
+}
+
+function makeStringXdr(value: string): string {
+  return xdr.ScVal.scvString(Buffer.from(value)).toXDR("base64");
+}
+
+function makeVecXdr(items: xdr.ScVal[]): string {
+  return xdr.ScVal.scvVec(items).toXDR("base64");
+}
+
+function makeMapXdr(entries: Array<[string, xdr.ScVal]>): string {
+  const mapEntries = entries.map(
+    ([key, val]) =>
+      new xdr.ScMapEntry({
+        key: xdr.ScVal.scvSymbol(key),
+        val,
+      })
+  );
+  return xdr.ScVal.scvMap(mapEntries).toXDR("base64");
+}
+
+function makeEvent(topics: string[], data: string): ContractEvent {
+  return {
+    ledger: 100,
+    ledgerClosedAt: "2024-01-01T00:00:00Z",
+    contractId: "CTEST",
+    id: "1",
+    type: "contract",
+    topics,
+    data,
+  };
+}
 
 describe("EventDecoder", () => {
   let decoder: EventDecoder;
@@ -8,50 +63,122 @@ describe("EventDecoder", () => {
     decoder = new EventDecoder();
   });
 
-  it("should return a new event object without mutating the original", () => {
-    const raw: ContractEvent = {
-      ledger: 100,
-      ledgerClosedAt: "2024-01-01T00:00:00Z",
-      contractId: "CTEST",
-      id: "1",
-      type: "contract",
-      topics: [],
-      data: "",
-    };
-    const decoded = decoder.decode(raw);
-    expect(decoded).not.toBe(raw);
+  describe("decodeTopics", () => {
+    it("decodes a single symbol topic", () => {
+      const event = makeEvent([makeSymbolXdr("transfer")], makeVoidXdr());
+      const result = decoder.decode(event);
+      expect(result.decodedTopics).toEqual(["transfer"]);
+    });
+
+    it("decodes multiple topics", () => {
+      const event = makeEvent(
+        [makeSymbolXdr("mint"), makeSymbolXdr("token")],
+        makeVoidXdr()
+      );
+      const result = decoder.decode(event);
+      expect(result.decodedTopics).toEqual(["mint", "token"]);
+    });
+
+    it("returns decode error string for invalid base64 topics without throwing", () => {
+      const event = makeEvent(["not-valid-xdr"], makeVoidXdr());
+      const result = decoder.decode(event);
+      expect(result.decodedTopics?.[0]).toBe("[decode error]");
+    });
+
+    it("returns empty array for empty topics", () => {
+      const event = makeEvent([], makeVoidXdr());
+      const result = decoder.decode(event);
+      expect(result.decodedTopics).toEqual([]);
+    });
   });
 
-  it("should handle decode errors gracefully without throwing", () => {
-    const raw: ContractEvent = {
-      ledger: 100,
-      ledgerClosedAt: "2024-01-01T00:00:00Z",
-      contractId: "CTEST",
-      id: "1",
-      type: "contract",
-      topics: ["not-valid-xdr"],
-      data: "not-valid-xdr",
-    };
-    expect(() => decoder.decode(raw)).not.toThrow();
-    const result = decoder.decode(raw);
-    expect(result.decodedTopics?.[0]).toBe("[decode error]");
-    expect(result.decodedData).toBe("[decode error]");
+  describe("decodeData", () => {
+    it("decodes a boolean true value", () => {
+      const event = makeEvent([], makeBoolXdr(true));
+      expect(decoder.decode(event).decodedData).toBe(true);
+    });
+
+    it("decodes a boolean false value", () => {
+      const event = makeEvent([], makeBoolXdr(false));
+      expect(decoder.decode(event).decodedData).toBe(false);
+    });
+
+    it("decodes a void value as null", () => {
+      const event = makeEvent([], makeVoidXdr());
+      expect(decoder.decode(event).decodedData).toBeNull();
+    });
+
+    it("decodes a u32 integer", () => {
+      const event = makeEvent([], makeU32Xdr(42));
+      expect(decoder.decode(event).decodedData).toBe(42);
+    });
+
+    it("decodes an i32 negative integer", () => {
+      const event = makeEvent([], makeI32Xdr(-7));
+      expect(decoder.decode(event).decodedData).toBe(-7);
+    });
+
+    it("decodes a string value", () => {
+      const event = makeEvent([], makeStringXdr("hello soroban"));
+      expect(decoder.decode(event).decodedData).toBe("hello soroban");
+    });
+
+    it("decodes a vec of u32 values", () => {
+      const event = makeEvent(
+        [],
+        makeVecXdr([xdr.ScVal.scvU32(1), xdr.ScVal.scvU32(2), xdr.ScVal.scvU32(3)])
+      );
+      expect(decoder.decode(event).decodedData).toEqual([1, 2, 3]);
+    });
+
+    it("decodes a map into a plain object", () => {
+      const event = makeEvent(
+        [],
+        makeMapXdr([
+          ["amount", xdr.ScVal.scvU32(1000)],
+          ["fee", xdr.ScVal.scvU32(10)],
+        ])
+      );
+      expect(decoder.decode(event).decodedData).toEqual({ amount: 1000, fee: 10 });
+    });
+
+    it("returns decode error string for invalid base64 data without throwing", () => {
+      const event = makeEvent([], "not-valid-xdr");
+      const result = decoder.decode(event);
+      expect(result.decodedData).toBe("[decode error]");
+    });
   });
 
-  it("decodeMany should process all events in an array", () => {
-    const events: ContractEvent[] = Array.from({ length: 5 }, (_, i) => ({
-      ledger: i,
-      ledgerClosedAt: "",
-      contractId: "CTEST",
-      id: String(i),
-      type: "contract" as const,
-      topics: [],
-      data: "",
-    }));
-    const results = decoder.decodeMany(events);
-    expect(results).toHaveLength(5);
+  describe("decode", () => {
+    it("does not mutate the original event", () => {
+      const event = makeEvent([makeSymbolXdr("transfer")], makeVoidXdr());
+      const original = { ...event };
+      decoder.decode(event);
+      expect(event).toEqual(original);
+    });
+
+    it("returns a new event object", () => {
+      const event = makeEvent([], makeVoidXdr());
+      const result = decoder.decode(event);
+      expect(result).not.toBe(event);
+    });
   });
 
-  // TODO: Add tests with real XDR fixtures from soroban-devkit-contracts
-  // See: https://github.com/soroban-devkit/soroban-devkit-core/issues/20
+  describe("decodeMany", () => {
+    it("decodes all events in an array", () => {
+      const events = [
+        makeEvent([makeSymbolXdr("transfer")], makeVoidXdr()),
+        makeEvent([makeSymbolXdr("mint")], makeU32Xdr(100)),
+      ];
+      const results = decoder.decodeMany(events);
+      expect(results).toHaveLength(2);
+      expect(results[0].decodedTopics).toEqual(["transfer"]);
+      expect(results[1].decodedTopics).toEqual(["mint"]);
+      expect(results[1].decodedData).toBe(100);
+    });
+
+    it("returns an empty array for empty input", () => {
+      expect(decoder.decodeMany([])).toEqual([]);
+    });
+  });
 });
