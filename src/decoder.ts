@@ -141,6 +141,7 @@ export class EventDecoder {
 
   /**
    * Convert a UInt128Parts XDR value into a BigInt.
+   * High 64 bits are multiplied by 2^64 before adding the low 64 bits.
    */
   private u128ToBigInt(parts: xdr.UInt128Parts): bigint {
     return (
@@ -151,6 +152,7 @@ export class EventDecoder {
 
   /**
    * Convert an Int128Parts XDR value into a BigInt.
+   * High 64 bits are multiplied by 2^64 before adding the low 64 bits.
    */
   private i128ToBigInt(parts: xdr.Int128Parts): bigint {
     return (
