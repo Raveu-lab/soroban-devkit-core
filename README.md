@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Stellar Wave Program](https://img.shields.io/badge/Stellar-Wave%20Program-blueviolet)](https://stellar.org)
 [![npm version](https://img.shields.io/npm/v/@soroban-devkit/core)](https://www.npmjs.com/package/@soroban-devkit/core)
-[![CI](https://github.com/soroban-devkit/soroban-devkit-core/actions/workflows/ci.yml/badge.svg)](https://github.com/soroban-devkit/soroban-devkit-core/actions)
+[![CI](https://github.com/Raveu-lab/soroban-devkit-core/actions/workflows/ci.yml/badge.svg)](https://github.com/Raveu-lab/soroban-devkit-core/actions)
 
 ---
 
@@ -193,7 +193,7 @@ This project is part of the **Stellar Wave Program** on [Drips](https://drips.ne
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, coding standards, and how to pick up an issue.
 
-**Good first issues** are tagged [`good first issue`](https://github.com/soroban-devkit/soroban-devkit-core/issues?q=label%3A%22good+first+issue%22) on GitHub.
+**Good first issues** are tagged [`good first issue`](https://github.com/Raveu-lab/soroban-devkit-core/issues?q=label%3A%22good+first+issue%22) on GitHub.
 
 ---
 
