@@ -3,14 +3,20 @@
  * No logic lives here — only type definitions and constants.
  */
 
+/** Supported Stellar network identifiers */
 export type Network = "mainnet" | "testnet" | "futurenet" | "local";
 
+/** RPC connection configuration for a Stellar network */
 export interface NetworkConfig {
+  /** Network identifier */
   network: Network;
+  /** Soroban RPC endpoint URL */
   rpcUrl: string;
+  /** Stellar network passphrase used when signing transactions */
   networkPassphrase: string;
 }
 
+/** Pre-configured RPC settings for all supported networks */
 export const NETWORK_CONFIGS: Record<Network, NetworkConfig> = {
   mainnet: {
     network: "mainnet",
@@ -34,32 +40,35 @@ export const NETWORK_CONFIGS: Record<Network, NetworkConfig> = {
   },
 };
 
+/** A normalized Soroban contract event */
 export interface ContractEvent {
   /** Ledger sequence where the event was emitted */
   ledger: number;
-  /** ISO timestamp of ledger close */
+  /** ISO 8601 timestamp of ledger close */
   ledgerClosedAt: string;
   /** Contract address that emitted the event (C... format) */
   contractId: string;
-  /** Paginated cursor ID */
+  /** Paginated cursor ID for this event */
   id: string;
-  /** Event type */
+  /** Event classification */
   type: "contract" | "system" | "diagnostic";
-  /** Raw topics as base64-encoded XDR */
+  /** Raw topics as base64-encoded XDR strings */
   topics: string[];
-  /** Raw data as base64-encoded XDR */
+  /** Raw data as a base64-encoded XDR string */
   data: string;
-  /** Human-readable decoded topics (populated by EventDecoder) */
+  /** Human-readable decoded topics — populated by EventDecoder */
   decodedTopics?: unknown[];
-  /** Human-readable decoded data (populated by EventDecoder) */
+  /** Human-readable decoded data — populated by EventDecoder */
   decodedData?: unknown;
 }
 
+/** Result returned by ContractSimulator.simulate() */
 export interface SimulationResult {
+  /** Whether the simulation succeeded */
   success: boolean;
-  /** Decoded return value from the simulated call */
+  /** Decoded return value from the simulated call, if any */
   returnValue?: unknown;
-  /** Resource footprint estimates */
+  /** Estimated resource usage */
   footprint: {
     readBytes: number;
     writeBytes: number;
@@ -70,10 +79,13 @@ export interface SimulationResult {
     cpuInstructions: string;
     memoryBytes: string;
   };
+  /** Error message when success is false */
   error?: string;
+  /** Raw RPC response for advanced use cases */
   rawResult?: unknown;
 }
 
+/** Options for BindingGenerator */
 export interface BindingGeneratorOptions {
   /** Deployed contract ID in C... format */
   contractId: string;
@@ -81,6 +93,6 @@ export interface BindingGeneratorOptions {
   outputDir: string;
   /** Network the contract is deployed on */
   network: Network;
-  /** Generate a full SDK wrapper class (default: true) */
+  /** Generate a full SDK wrapper class around the bindings (default: true) */
   generateWrapper?: boolean;
 }
