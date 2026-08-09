@@ -39,7 +39,12 @@ export class ContractSimulator {
 
   /**
    * Simulate a contract invocation and return a normalized SimulationResult.
-   * Never throws — all errors are returned as { success: false, error }.
+   * Never throws — all errors are caught and returned as { success: false, error }.
+   *
+   * @param contractId - The contract address in C... format
+   * @param method     - The contract function name to call
+   * @param args       - Array of XDR ScVal arguments
+   * @param caller     - The caller's Stellar public key in G... format
    */
   async simulate(
     contractId: string,
