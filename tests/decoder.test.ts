@@ -235,3 +235,35 @@ describe("EventDecoder — additional edge cases", () => {
     expect(result.decodedTopics).toEqual(["burn", 999, false]);
   });
 });
+
+describe("EventDecoder — isVoid and isNumber helpers", () => {
+  let decoder: EventDecoder;
+
+  beforeEach(() => {
+    decoder = new EventDecoder();
+  });
+
+  it("isVoid returns true for null", () => {
+    expect(decoder.isVoid(null)).toBe(true);
+  });
+
+  it("isVoid returns false for a number", () => {
+    expect(decoder.isVoid(42)).toBe(false);
+  });
+
+  it("isVoid returns false for a string", () => {
+    expect(decoder.isVoid("transfer")).toBe(false);
+  });
+
+  it("isNumber returns true for a number", () => {
+    expect(decoder.isNumber(42)).toBe(true);
+  });
+
+  it("isNumber returns false for null", () => {
+    expect(decoder.isNumber(null)).toBe(false);
+  });
+
+  it("isNumber returns false for a string", () => {
+    expect(decoder.isNumber("42")).toBe(false);
+  });
+});
