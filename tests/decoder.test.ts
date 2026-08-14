@@ -1,6 +1,7 @@
 import { xdr } from "@stellar/stellar-sdk";
 import { EventDecoder } from "../src/decoder";
 import { ContractEvent } from "../src/types";
+import { isDecodedVoid, isDecodedNumber } from "../src/decoded-value";
 
 /**
  * Helpers to build real XDR ScVal fixtures
@@ -236,34 +237,23 @@ describe("EventDecoder — additional edge cases", () => {
   });
 });
 
-describe("EventDecoder — isVoid and isNumber helpers", () => {
+
+describe("EventDecoder — type-guard integration", () => {
   let decoder: EventDecoder;
 
   beforeEach(() => {
     decoder = new EventDecoder();
   });
 
-  it("isVoid returns true for null", () => {
-    expect(decoder.isVoid(null)).toBe(true);
+  it("decoded void value passes isDecodedVoid check", () => {
+    const event = makeEvent([], makeVoidXdr());
+    const result = decoder.decode(event);
+    expect(isDecodedVoid(result.decodedData)).toBe(true);
   });
 
-  it("isVoid returns false for a number", () => {
-    expect(decoder.isVoid(42)).toBe(false);
-  });
-
-  it("isVoid returns false for a string", () => {
-    expect(decoder.isVoid("transfer")).toBe(false);
-  });
-
-  it("isNumber returns true for a number", () => {
-    expect(decoder.isNumber(42)).toBe(true);
-  });
-
-  it("isNumber returns false for null", () => {
-    expect(decoder.isNumber(null)).toBe(false);
-  });
-
-  it("isNumber returns false for a string", () => {
-    expect(decoder.isNumber("42")).toBe(false);
+  it("decoded u32 value passes isDecodedNumber check", () => {
+    const event = makeEvent([], makeU32Xdr(99));
+    const result = decoder.decode(event);
+    expect(isDecodedNumber(result.decodedData)).toBe(true);
   });
 });
