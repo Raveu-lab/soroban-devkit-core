@@ -62,19 +62,6 @@ export class EventDecoder {
     }
   }
 
-  /**
-   * Check whether a decoded data value is null (scvVoid).
-   */
-  isVoid(decodedData: unknown): boolean {
-    return decodedData === null;
-  }
-
-  /**
-   * Check whether a decoded data value is a plain number (scvU32 or scvI32).
-   */
-  isNumber(decodedData: unknown): boolean {
-    return typeof decodedData === "number";
-  }
   private scValToJs(val: xdr.ScVal): unknown {
     const type = val.switch();
 
