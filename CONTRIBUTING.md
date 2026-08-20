@@ -1,6 +1,6 @@
 # Contributing to soroban-devkit-core
 
-This project is part of the **Stellar Wave Program** on [Drips](https://drips.network). Contributors earn rewards for completing issues during active Wave sprints.
+This project is open source and welcomes contributions from the Stellar developer community.
 
 ---
 

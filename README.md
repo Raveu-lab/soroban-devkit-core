@@ -3,7 +3,6 @@
 > The core TypeScript library powering the Soroban DevKit ecosystem.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Stellar Wave Program](https://img.shields.io/badge/Stellar-Wave%20Program-blueviolet)](https://stellar.org)
 [![npm version](https://img.shields.io/npm/v/@soroban-devkit/core)](https://www.npmjs.com/package/@soroban-devkit/core)
 [![CI](https://github.com/Raveu-lab/soroban-devkit-core/actions/workflows/ci.yml/badge.svg)](https://github.com/Raveu-lab/soroban-devkit-core/actions)
 
@@ -189,7 +188,7 @@ soroban-devkit-core/
 
 ## Contributing
 
-This project is part of the **Stellar Wave Program** on [Drips](https://drips.network). Contributors earn rewards for completing issues during active Wave sprints.
+This project is open source and welcomes contributions from the Stellar developer community.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, coding standards, and how to pick up an issue.
 
@@ -211,4 +210,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, coding standards,
 
 MIT — see [LICENSE](LICENSE).
 
-Built for the Stellar ecosystem. Sponsored by the [Stellar Development Foundation](https://stellar.org) via the Stellar Wave Program.
+Built for the Stellar ecosystem.
