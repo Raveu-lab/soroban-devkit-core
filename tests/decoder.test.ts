@@ -1,4 +1,4 @@
-import { xdr } from "@stellar/stellar-sdk";
+import { xdr, Address } from "@stellar/stellar-sdk";
 import { EventDecoder } from "../src/decoder";
 import { ContractEvent } from "../src/types";
 import { isDecodedVoid, isDecodedNumber } from "../src/decoded-value";
@@ -20,6 +20,10 @@ function makeU32Xdr(value: number): string {
 
 function makeI32Xdr(value: number): string {
   return xdr.ScVal.scvI32(value).toXDR("base64");
+}
+
+function makeAddressXdr(value: string): string {
+  return Address.fromString(value).toScVal().toXDR("base64");
 }
 
 function makeVoidXdr(): string {
@@ -72,10 +76,7 @@ describe("EventDecoder", () => {
     });
 
     it("decodes multiple topics", () => {
-      const event = makeEvent(
-        [makeSymbolXdr("mint"), makeSymbolXdr("token")],
-        makeVoidXdr()
-      );
+      const event = makeEvent([makeSymbolXdr("mint"), makeSymbolXdr("token")], makeVoidXdr());
       const result = decoder.decode(event);
       expect(result.decodedTopics).toEqual(["mint", "token"]);
     });
@@ -143,6 +144,18 @@ describe("EventDecoder", () => {
       expect(decoder.decode(event).decodedData).toEqual({ amount: 1000, fee: 10 });
     });
 
+    it("decodes an account address (G...) to its strkey string", () => {
+      const address = "GACP4WS6CA6GPH7NWEPY6AKRTNQSRAL7KB2SDYEKNN7YMMCYGKKI2HE4";
+      const event = makeEvent([], makeAddressXdr(address));
+      expect(decoder.decode(event).decodedData).toBe(address);
+    });
+
+    it("decodes a contract address (C...) to its strkey string", () => {
+      const address = "CCNGTMOQNIF5VFJCHCF6S2CGW473IN76RPAX72YOTGDXC6VDZ4XINN45";
+      const event = makeEvent([], makeAddressXdr(address));
+      expect(decoder.decode(event).decodedData).toBe(address);
+    });
+
     it("returns decode error string for invalid base64 data without throwing", () => {
       const event = makeEvent([], "not-valid-xdr");
       const result = decoder.decode(event);
@@ -199,10 +212,7 @@ describe("EventDecoder — additional edge cases", () => {
   });
 
   it("decodes a vec of symbols", () => {
-    const vec = makeVecXdr([
-      xdr.ScVal.scvSymbol("alpha"),
-      xdr.ScVal.scvSymbol("beta"),
-    ]);
+    const vec = makeVecXdr([xdr.ScVal.scvSymbol("alpha"), xdr.ScVal.scvSymbol("beta")]);
     const event = makeEvent([], vec);
     expect(decoder.decode(event).decodedData).toEqual(["alpha", "beta"]);
   });
@@ -236,7 +246,6 @@ describe("EventDecoder — additional edge cases", () => {
     expect(result.decodedTopics).toEqual(["burn", 999, false]);
   });
 });
-
 
 describe("EventDecoder — type-guard integration", () => {
   let decoder: EventDecoder;

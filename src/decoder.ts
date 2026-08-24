@@ -1,4 +1,4 @@
-import { xdr } from "@stellar/stellar-sdk";
+import { xdr, Address } from "@stellar/stellar-sdk";
 import { ContractEvent } from "./types";
 
 /**
@@ -91,7 +91,7 @@ export class EventDecoder {
         return this.i128ToBigInt(val.i128()).toString();
 
       case xdr.ScValType.scvAddress():
-        return val.address().toString();
+        return Address.fromScAddress(val.address()).toString();
 
       case xdr.ScValType.scvSymbol():
         return val.sym().toString();
@@ -142,8 +142,7 @@ export class EventDecoder {
    */
   private u128ToBigInt(parts: xdr.UInt128Parts): bigint {
     return (
-      BigInt(parts.hi().toString()) * BigInt("18446744073709551616") +
-      BigInt(parts.lo().toString())
+      BigInt(parts.hi().toString()) * BigInt("18446744073709551616") + BigInt(parts.lo().toString())
     );
   }
 
@@ -153,8 +152,7 @@ export class EventDecoder {
    */
   private i128ToBigInt(parts: xdr.Int128Parts): bigint {
     return (
-      BigInt(parts.hi().toString()) * BigInt("18446744073709551616") +
-      BigInt(parts.lo().toString())
+      BigInt(parts.hi().toString()) * BigInt("18446744073709551616") + BigInt(parts.lo().toString())
     );
   }
 }
