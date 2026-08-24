@@ -7,6 +7,7 @@
 export * from "./types";
 export * from "./simulator";
 export * from "./decoder";
+export * from "./encoder";
 export * from "./monitor";
 export * from "./bindings";
 export * from "./decoded-value";
