@@ -18,6 +18,7 @@ It is the engine underneath the Soroban DevKit — a focused, well-tested TypeSc
 - **EventDecoder** — decode raw base64 XDR contract events into typed, human-readable JSON automatically
 - **ContractMonitor** — poll any set of contracts for real-time events with filtering and auto-decode built in
 - **BindingGenerator** — read a deployed contract's on-chain WASM spec and generate strongly-typed TypeScript bindings
+- **ArgEncoder** — turn plain JS values (numbers, strings, arrays, objects) into typed `xdr.ScVal` contract arguments, without touching the Stellar SDK yourself
 
 No indexer to run. No hosted service to depend on. Just a library you install and use.
 
@@ -48,15 +49,15 @@ Requires Node.js >= 18.
 ### Simulate a contract call
 
 ```ts
-import { ContractSimulator } from "@soroban-devkit/core";
-import { xdr } from "@stellar/stellar-sdk";
+import { ContractSimulator, ArgEncoder } from "@soroban-devkit/core";
 
 const simulator = new ContractSimulator("testnet");
+const encoder = new ArgEncoder();
 
 const result = await simulator.simulate(
   "CXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX", // contract ID
   "transfer",                                                        // method name
-  [/* xdr.ScVal args */],
+  encoder.encodeArgs(["GABC...", "GXYZ...", "1000000"]),
   "GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"  // caller address
 );
 
@@ -116,6 +117,16 @@ await gen.generate();
 // Outputs: ./generated/CXXXXXX_bindings.ts
 ```
 
+### Encode arguments without touching the Stellar SDK
+
+```ts
+import { ArgEncoder } from "@soroban-devkit/core";
+
+const encoder = new ArgEncoder();
+const args = encoder.encodeArgs(["GABC...", "1000000", true]);
+// Infers: Address, i128 (large digit strings), and bool respectively
+```
+
 ---
 
 ## API Reference
@@ -151,6 +162,13 @@ await gen.generate();
 | `new BindingGenerator(options)` | Configure contract ID, output directory, network |
 | `generate()` | Fetch the contract spec and write TypeScript bindings to disk |
 
+### `ArgEncoder`
+
+| Method | Description |
+|--------|-------------|
+| `encode(value)` | Encode a single plain value into an `xdr.ScVal`, inferring its type |
+| `encodeArgs(values)` | Encode an array of plain values, in order |
+
 ---
 
 ## Supported Networks
@@ -174,11 +192,14 @@ soroban-devkit-core/
 │   ├── simulator.ts      # ContractSimulator
 │   ├── decoder.ts        # EventDecoder
 │   ├── monitor.ts        # ContractMonitor
-│   └── bindings.ts       # BindingGenerator
+│   ├── bindings.ts       # BindingGenerator
+│   └── encoder.ts        # ArgEncoder
 ├── tests/
 │   ├── simulator.test.ts
 │   ├── decoder.test.ts
-│   └── monitor.test.ts
+│   ├── monitor.test.ts
+│   ├── bindings.test.ts
+│   └── encoder.test.ts
 ├── package.json
 ├── tsconfig.json
 └── README.md
@@ -198,7 +219,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, coding standards,
 
 ## Roadmap
 
-- [ ] Full WASM spec parsing for `BindingGenerator` (generate method stubs from on-chain ABI)
+- [ ] Typed struct/union/enum bindings for `BindingGenerator` (currently maps to `any` — needs generating the UDT definitions themselves)
 - [ ] WebSocket/streaming support for `ContractMonitor`
 - [ ] Multi-step simulation chaining (simulate a sequence of calls)
 - [ ] Transaction replay from historical ledger

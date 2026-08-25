@@ -26,7 +26,9 @@ Everything is stateless except `ContractMonitor`, which holds an internal pollin
 │  ┌────────▼────────┐   ┌────────▼────────┐             │
 │  │ ContractMonitor │   │ BindingGenerator│             │
 │  └────────┬────────┘   └────────┬────────┘             │
-│           │                     │                       │
+│           │            ┌────────▼────────┐             │
+│           │            │   ArgEncoder    │             │
+│           │            └────────┬────────┘             │
 │  ┌────────▼─────────────────────▼────────┐             │
 │  │              types.ts                  │             │
 │  │  NetworkConfig | ContractEvent |       │             │
@@ -117,6 +119,38 @@ decode(event)
 
 ---
 
+### `encoder.ts` — `ArgEncoder`
+
+**Responsibility:** The inverse of `EventDecoder` — convert plain JavaScript values into XDR `ScVal`, so callers never need to import the Stellar SDK just to build contract call arguments.
+
+**Flow:**
+```
+encode(value)
+  │
+  ├─ infer a type from the JS value's shape (no contract spec consulted)
+  └─ construct the matching xdr.ScVal
+```
+
+**Type inference:**
+
+| JS value | Inferred XDR type |
+|----------|-------------------|
+| `boolean` | `scvBool` |
+| `null` | `scvVoid` |
+| safe i32 integer | `scvI32` |
+| `G...`/`C...` string | `scvAddress` |
+| digit string (e.g. `"1000000"`) | `scvI128` |
+| short `[A-Za-z0-9_]` string | `scvSymbol` |
+| other string | `scvString` |
+| array | `scvVec` (each element encoded recursively) |
+| plain object | `scvMap` (keys as `scvSymbol`, values recursively) |
+
+Throws for values with no sensible inferred type (`undefined`, non-integer numbers, numbers outside i32 range, functions).
+
+**State:** Stateless. Safe to use as a singleton.
+
+---
+
 ### `monitor.ts` — `ContractMonitor`
 
 **Responsibility:** Poll the Stellar RPC `getEvents` endpoint on a configurable interval, filter results, decode events, and emit them to registered callbacks.
@@ -150,21 +184,22 @@ stop()
 
 ### `bindings.ts` — `BindingGenerator`
 
-**Responsibility:** Fetch a deployed contract's on-chain instance entry, parse the WASM spec, and write TypeScript type definitions to disk.
+**Responsibility:** Fetch a deployed contract's on-chain spec and generate a TypeScript class with one typed method per contract function.
 
 **Flow:**
 ```
 generate()
   │
-  ├─ build LedgerKey for contract instance
-  ├─ server.getLedgerEntries(key)    → fetch on-chain contract data
-  ├─ extract ContractExecutable      → verify it is a WASM contract
-  ├─ parse contract spec XDR         → extract function signatures + types
-  ├─ map XDR types → TypeScript types
+  ├─ Client.from({ contractId, rpcUrl, networkPassphrase })
+  │    (stellar-sdk's Client fetches the contract instance, WASM, and
+  │     parses its embedded contractspecv0 section into ScSpecEntry[])
+  ├─ client.spec.funcs()             → function name, inputs, outputs
+  ├─ buildBindings(contractId, funcs) → pure codegen, testable without a network call
+  │    └─ scSpecTypeToTs(type)       → maps each ScSpecTypeDef to a TS type
   └─ write .ts file to outputDir
 ```
 
-**Current state:** Spec parsing (step 4) is scaffolded. Full implementation is an open contributor task (see GitHub issue #15).
+**Current state:** Full for primitive types, collections (`Vec`, `Map`, `Option`, `Tuple`), and `Address`/numeric/string types — each maps to a real TypeScript type. Struct/union/enum UDTs map to `any` (with the type name kept in a comment) since fully typing them means also generating their definitions, which is a separate, larger feature.
 
 **State:** Stateless after construction. Writes to disk as a side effect.
 
