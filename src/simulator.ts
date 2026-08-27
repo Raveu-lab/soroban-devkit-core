@@ -28,9 +28,7 @@ export class ContractSimulator {
 
   constructor(networkOrConfig: Network | NetworkConfig) {
     this.config =
-      typeof networkOrConfig === "string"
-        ? NETWORK_CONFIGS[networkOrConfig]
-        : networkOrConfig;
+      typeof networkOrConfig === "string" ? NETWORK_CONFIGS[networkOrConfig] : networkOrConfig;
 
     this.server = new SorobanRpc.Server(this.config.rpcUrl, {
       allowHttp: this.config.network === "local",
@@ -58,9 +56,7 @@ export class ContractSimulator {
       const response = await this.server.simulateTransaction(tx);
       return this.normalizeResponse(response);
     } catch (error) {
-      return this.normalizeSimulationError(
-        error instanceof Error ? error.message : String(error)
-      );
+      return this.normalizeSimulationError(error instanceof Error ? error.message : String(error));
     }
   }
 
@@ -137,18 +133,18 @@ export class ContractSimulator {
 
   /**
    * Normalize a successful simulation response.
+   * Public so it can be tested in isolation without a network call.
    */
-  private normalizeSuccessResponse(
+  normalizeSuccessResponse(
     response: SorobanRpc.Api.SimulateTransactionSuccessResponse
   ): SimulationResult {
+    const resources = response.transactionData?.build().resources();
     return {
       success: true,
       footprint: {
-        readBytes: Number(response.minResourceFee ?? 0),
-        writeBytes: 0,
-        instructions: Number(
-          response.transactionData?.build().resources().instructions() ?? 0
-        ),
+        readBytes: Number(resources?.readBytes() ?? 0),
+        writeBytes: Number(resources?.writeBytes() ?? 0),
+        instructions: Number(resources?.instructions() ?? 0),
       },
       cost: {
         cpuInstructions: response.cost?.cpuInsns?.toString() ?? "0",
