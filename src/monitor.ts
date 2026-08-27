@@ -1,4 +1,4 @@
-import { SorobanRpc } from "@stellar/stellar-sdk";
+import { SorobanRpc, xdr } from "@stellar/stellar-sdk";
 import { ContractEvent, Network, NETWORK_CONFIGS, NetworkConfig } from "./types";
 import { EventDecoder } from "./decoder";
 
@@ -47,9 +47,7 @@ export class ContractMonitor {
 
   constructor(networkOrConfig: Network | NetworkConfig) {
     const config =
-      typeof networkOrConfig === "string"
-        ? NETWORK_CONFIGS[networkOrConfig]
-        : networkOrConfig;
+      typeof networkOrConfig === "string" ? NETWORK_CONFIGS[networkOrConfig] : networkOrConfig;
 
     this.server = new SorobanRpc.Server(config.rpcUrl, {
       allowHttp: config.network === "local",
@@ -103,7 +101,8 @@ export class ContractMonitor {
     };
 
     if (this.options.eventFilter) {
-      filter.topics = [[`SCS:${this.options.eventFilter}`]];
+      const topicScVal = xdr.ScVal.scvSymbol(this.options.eventFilter).toXDR("base64");
+      filter.topics = [[topicScVal]];
     }
 
     return [filter];
@@ -150,10 +149,7 @@ export class ContractMonitor {
 
   private schedulePoll(): void {
     if (!this.running) return;
-    this.pollTimer = setTimeout(
-      () => this.runPollCycle(),
-      this.options.pollingIntervalMs ?? 5000
-    );
+    this.pollTimer = setTimeout(() => this.runPollCycle(), this.options.pollingIntervalMs ?? 5000);
   }
 
   private runPollCycle(): void {
@@ -181,9 +177,7 @@ export class ContractMonitor {
           topics: raw.topic.map((t) => t.toXDR("base64")),
           data: raw.value.toXDR("base64"),
         };
-        const final = this.options.decode !== false
-          ? this.decoder.decode(event)
-          : event;
+        const final = this.options.decode !== false ? this.decoder.decode(event) : event;
         this.emitEvent(final);
       }
     }

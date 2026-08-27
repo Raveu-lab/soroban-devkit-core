@@ -1,3 +1,4 @@
+import { xdr } from "@stellar/stellar-sdk";
 import { ContractMonitor } from "../src/monitor";
 import { ContractEvent } from "../src/types";
 
@@ -76,6 +77,20 @@ describe("ContractMonitor", () => {
       monitor.watch({ contractIds: ["CABC"], eventFilter: "transfer" });
       const filters = monitor.buildEventFilters();
       expect(filters[0].topics).toBeDefined();
+    });
+
+    it("encodes eventFilter as a real base64 XDR Symbol, matching what contracts actually emit", () => {
+      const monitor = new ContractMonitor("testnet");
+      monitor.watch({ contractIds: ["CABC"], eventFilter: "transfer" });
+      const filters = monitor.buildEventFilters();
+
+      const topicSegment = filters[0].topics?.[0]?.[0];
+      expect(topicSegment).toBeDefined();
+      // Must round-trip through the SDK's own XDR parser — a fabricated
+      // string like "SCS:transfer" would throw here.
+      const decoded = xdr.ScVal.fromXDR(topicSegment as string, "base64");
+      expect(decoded.switch()).toBe(xdr.ScValType.scvSymbol());
+      expect(decoded.sym().toString()).toBe("transfer");
     });
 
     it("omits topic filter when eventFilter is not set", () => {
@@ -193,10 +208,7 @@ describe("ContractMonitor — additional edge cases", () => {
         contractId: "CTEST",
         id: "x",
         type: "contract",
-        topic: [
-          { toXDR: (_: string) => "TOPIC1" },
-          { toXDR: (_: string) => "TOPIC2" },
-        ],
+        topic: [{ toXDR: (_: string) => "TOPIC1" }, { toXDR: (_: string) => "TOPIC2" }],
         value: { toXDR: (_: string) => "" },
       };
       const event = monitor.normalizeRawEvent(raw as never);
