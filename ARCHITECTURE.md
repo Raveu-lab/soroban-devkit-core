@@ -56,7 +56,7 @@ Everything is stateless except `ContractMonitor`, which holds an internal pollin
 The single source of truth for all shared types and constants. No logic lives here.
 
 - `Network` — union type of supported network names
-- `NetworkConfig` — RPC URL + network passphrase pair
+- `NetworkConfig` — RPC URL + network passphrase pair, plus optional auth headers for custom/paid RPC providers
 - `NETWORK_CONFIGS` — hardcoded map of `Network → NetworkConfig`
 - `ContractEvent` — normalized event shape (raw XDR + decoded fields)
 - `SimulationResult` — result shape returned by `ContractSimulator`

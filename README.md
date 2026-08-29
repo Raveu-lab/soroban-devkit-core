@@ -180,6 +180,19 @@ const args = encoder.encodeArgs(["GABC...", "1000000", true]);
 | `futurenet` | `https://rpc-futurenet.stellar.org` |
 | `local` | `http://localhost:8000/soroban/rpc` |
 
+Pass a `NetworkConfig` object instead of a network name to use a custom RPC endpoint (e.g. a paid provider), optionally with auth headers:
+
+```ts
+const simulator = new ContractSimulator({
+  network: "mainnet",
+  rpcUrl: "https://my-provider.example/rpc",
+  networkPassphrase: "Public Global Stellar Network ; September 2015",
+  headers: { "X-Api-Key": process.env.RPC_API_KEY! },
+});
+```
+
+`ContractMonitor` accepts the same shape.
+
 ---
 
 ## Project Structure
@@ -223,7 +236,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, coding standards,
 - [ ] WebSocket/streaming support for `ContractMonitor`
 - [ ] Multi-step simulation chaining (simulate a sequence of calls)
 - [ ] Transaction replay from historical ledger
-- [ ] Support for custom RPC endpoints and auth headers
 
 ---
 
