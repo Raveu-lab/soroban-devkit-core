@@ -69,6 +69,18 @@ if (result.success) {
 }
 ```
 
+### Check a multi-step flow before submitting any of it
+
+```ts
+const results = await simulator.simulateSequence([
+  { contractId: "CTOKEN...", method: "approve", args: [...], caller: "GXXXX..." },
+  { contractId: "CDEX...", method: "swap", args: [...], caller: "GXXXX..." },
+]);
+// Each call is simulated independently against current ledger state — this
+// checks "would each step work and what would it cost", not "run this as
+// one atomic on-chain transaction". Stops at the first failure by default.
+```
+
 ### Decode contract events
 
 ```ts
@@ -137,6 +149,7 @@ const args = encoder.encodeArgs(["GABC...", "1000000", true]);
 |--------|-------------|
 | `new ContractSimulator(network)` | Create a simulator for `mainnet`, `testnet`, `futurenet`, or `local` |
 | `simulate(contractId, method, args, caller)` | Simulate a contract call and return a `SimulationResult` |
+| `simulateSequence(calls, options?)` | Simulate several independent calls in order; stops at the first failure unless `{ stopOnFailure: false }` |
 
 ### `EventDecoder`
 
@@ -234,7 +247,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, coding standards,
 
 - [ ] Typed struct/union/enum bindings for `BindingGenerator` (currently maps to `any` — needs generating the UDT definitions themselves)
 - [ ] WebSocket/streaming support for `ContractMonitor`
-- [ ] Multi-step simulation chaining (simulate a sequence of calls)
 - [ ] Transaction replay from historical ledger
 
 ---

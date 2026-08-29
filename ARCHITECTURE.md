@@ -60,6 +60,7 @@ The single source of truth for all shared types and constants. No logic lives he
 - `NETWORK_CONFIGS` — hardcoded map of `Network → NetworkConfig`
 - `ContractEvent` — normalized event shape (raw XDR + decoded fields)
 - `SimulationResult` — result shape returned by `ContractSimulator`
+- `SimulationCall` — one call in a sequence passed to `ContractSimulator.simulateSequence()`
 - `BindingGeneratorOptions` — configuration for `BindingGenerator`
 
 **Rule:** No class or function is imported into `types.ts`. It imports nothing from this package.
@@ -83,6 +84,8 @@ simulate(contractId, method, args, caller)
 **Error handling:** All RPC errors and simulation failures are caught and returned as `{ success: false, error: string }` — never thrown to the caller.
 
 **State:** Stateless. A new `SorobanRpc.Server` instance is created per `ContractSimulator` instance.
+
+**`simulateSequence(calls, options?)`:** Calls `simulate()` for each entry in order, collecting results. Each call is independent — a simulation never commits anything on-chain, so there's no real state to chain between steps; this is for checking "would each of these calls succeed, and what would they cost" before submitting any of them for real, not for atomically composing them into one transaction. Stops at the first failing call by default (`{ stopOnFailure: true }`); pass `{ stopOnFailure: false }` to run every call regardless.
 
 ---
 
