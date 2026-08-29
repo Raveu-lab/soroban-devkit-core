@@ -93,8 +93,8 @@ export interface BindingGeneratorOptions {
   contractId: string;
   /** Output directory for generated TypeScript files */
   outputDir: string;
-  /** Network the contract is deployed on */
-  network: Network;
+  /** Network the contract is deployed on — a name, or a full config for a custom RPC endpoint/auth headers */
+  network: Network | NetworkConfig;
   /** Generate a full SDK wrapper class around the bindings (default: true) */
   generateWrapper?: boolean;
 }

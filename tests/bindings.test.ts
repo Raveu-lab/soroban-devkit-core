@@ -18,6 +18,27 @@ function func(
   return new xdr.ScSpecFunctionV0({ doc: "", name, inputs, outputs });
 }
 
+describe("BindingGenerator constructor", () => {
+  it("accepts a custom NetworkConfig, not just a Network name, so it can use a custom RPC endpoint", () => {
+    // Note: headers are NOT respected here, unlike ContractSimulator/
+    // ContractMonitor — stellar-sdk's Client.from() (which generate() uses)
+    // has no headers option in its ClientOptions. NetworkConfig still allows
+    // a custom rpcUrl/networkPassphrase, just not auth headers.
+    expect(
+      () =>
+        new BindingGenerator({
+          contractId: "CCNGTMOQNIF5VFJCHCF6S2CGW473IN76RPAX72YOTGDXC6VDZ4XINN45",
+          outputDir: "/tmp/does-not-matter",
+          network: {
+            network: "mainnet",
+            rpcUrl: "https://my-provider.example/rpc",
+            networkPassphrase: "Public Global Stellar Network ; September 2015",
+          },
+        })
+    ).not.toThrow();
+  });
+});
+
 describe("BindingGenerator.buildBindings", () => {
   const generator = new BindingGenerator({
     contractId: "CCNGTMOQNIF5VFJCHCF6S2CGW473IN76RPAX72YOTGDXC6VDZ4XINN45",

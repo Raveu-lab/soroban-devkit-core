@@ -42,12 +42,15 @@ export class BindingGenerator {
    * Fetch the contract's spec from the network and generate TypeScript bindings.
    */
   async generate(): Promise<string> {
-    const config = NETWORK_CONFIGS[this.options.network];
+    const config =
+      typeof this.options.network === "string"
+        ? NETWORK_CONFIGS[this.options.network]
+        : this.options.network;
     const client = await Client.from({
       contractId: this.options.contractId,
       networkPassphrase: config.networkPassphrase,
       rpcUrl: config.rpcUrl,
-      allowHttp: this.options.network === "local",
+      allowHttp: config.network === "local",
     });
 
     const content = this.buildBindings(this.options.contractId, client.spec.funcs());
