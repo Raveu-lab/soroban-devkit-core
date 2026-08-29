@@ -199,6 +199,8 @@ generate()
   └─ write .ts file to outputDir
 ```
 
+`network` accepts a custom `NetworkConfig` (not just a `Network` name), for a custom RPC endpoint — like `ContractSimulator`/`ContractMonitor`. Auth headers are the one exception: `Client.from()`'s `ClientOptions` has no headers field, so `NetworkConfig.headers` is silently not used here (it is respected by `ContractSimulator` and `ContractMonitor`).
+
 **Current state:** Full for primitive types, collections (`Vec`, `Map`, `Option`, `Tuple`), and `Address`/numeric/string types — each maps to a real TypeScript type. Struct/union/enum UDTs map to `any` (with the type name kept in a comment) since fully typing them means also generating their definitions, which is a separate, larger feature.
 
 **State:** Stateless after construction. Writes to disk as a side effect.
