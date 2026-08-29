@@ -51,6 +51,7 @@ export class ContractMonitor {
 
     this.server = new SorobanRpc.Server(config.rpcUrl, {
       allowHttp: config.network === "local",
+      headers: config.headers,
     });
     this.decoder = new EventDecoder();
   }

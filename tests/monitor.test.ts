@@ -18,6 +18,18 @@ describe("ContractMonitor", () => {
           })
       ).not.toThrow();
     });
+
+    it("accepts a NetworkConfig with custom auth headers, for paid RPC providers", () => {
+      expect(
+        () =>
+          new ContractMonitor({
+            network: "mainnet",
+            rpcUrl: "https://my-provider.example/rpc",
+            networkPassphrase: "Public Global Stellar Network ; September 2015",
+            headers: { "X-Api-Key": "secret" },
+          })
+      ).not.toThrow();
+    });
   });
 
   describe("watch", () => {

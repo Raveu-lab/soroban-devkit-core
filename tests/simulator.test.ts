@@ -19,6 +19,18 @@ describe("ContractSimulator", () => {
       ).not.toThrow();
     });
 
+    it("accepts a NetworkConfig with custom auth headers, for paid RPC providers", () => {
+      expect(
+        () =>
+          new ContractSimulator({
+            network: "mainnet",
+            rpcUrl: "https://my-provider.example/rpc",
+            networkPassphrase: "Public Global Stellar Network ; September 2015",
+            headers: { "X-Api-Key": "secret" },
+          })
+      ).not.toThrow();
+    });
+
     it("resolves all supported network names", () => {
       const networks = ["mainnet", "testnet", "futurenet", "local"] as const;
       for (const net of networks) {

@@ -14,6 +14,8 @@ export interface NetworkConfig {
   rpcUrl: string;
   /** Stellar network passphrase used when signing transactions */
   networkPassphrase: string;
+  /** Extra HTTP headers sent with every RPC request — e.g. an API key for a paid provider */
+  headers?: Record<string, string>;
 }
 
 /** Pre-configured RPC settings for all supported networks */

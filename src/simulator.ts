@@ -32,6 +32,7 @@ export class ContractSimulator {
 
     this.server = new SorobanRpc.Server(this.config.rpcUrl, {
       allowHttp: this.config.network === "local",
+      headers: this.config.headers,
     });
   }
 
