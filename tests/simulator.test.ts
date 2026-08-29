@@ -1,6 +1,6 @@
 import { xdr, SorobanDataBuilder } from "@stellar/stellar-sdk";
 import { ContractSimulator } from "../src/simulator";
-import { NETWORK_CONFIGS } from "../src/types";
+import { NETWORK_CONFIGS, SimulationResult, SimulationCall } from "../src/types";
 
 describe("ContractSimulator", () => {
   describe("constructor", () => {
@@ -184,6 +184,82 @@ describe("ContractSimulator — additional edge cases", () => {
         instructions: 1000,
       });
       expect(result.cost).toEqual({ cpuInstructions: "42", memoryBytes: "84" });
+    });
+  });
+
+  describe("simulateSequence", () => {
+    function makeResult(success: boolean, error?: string): SimulationResult {
+      return {
+        success,
+        error,
+        footprint: { readBytes: 0, writeBytes: 0, instructions: 0 },
+        cost: { cpuInstructions: "0", memoryBytes: "0" },
+      };
+    }
+
+    function makeCall(method: string): SimulationCall {
+      return { contractId: "CABC", method, args: [], caller: "GABC" };
+    }
+
+    it("runs each call in order and returns all results when every call succeeds", async () => {
+      const sim = new ContractSimulator("testnet");
+      const spy = jest
+        .spyOn(sim, "simulate")
+        .mockResolvedValueOnce(makeResult(true))
+        .mockResolvedValueOnce(makeResult(true))
+        .mockResolvedValueOnce(makeResult(true));
+
+      const results = await sim.simulateSequence([
+        makeCall("first"),
+        makeCall("second"),
+        makeCall("third"),
+      ]);
+
+      expect(results).toHaveLength(3);
+      expect(results.every((r) => r.success)).toBe(true);
+      expect(spy).toHaveBeenCalledTimes(3);
+      expect(spy.mock.calls[0][1]).toBe("first");
+      expect(spy.mock.calls[1][1]).toBe("second");
+      expect(spy.mock.calls[2][1]).toBe("third");
+    });
+
+    it("stops after the first failure by default, and does not call later steps", async () => {
+      const sim = new ContractSimulator("testnet");
+      const spy = jest
+        .spyOn(sim, "simulate")
+        .mockResolvedValueOnce(makeResult(true))
+        .mockResolvedValueOnce(makeResult(false, "boom"))
+        .mockResolvedValueOnce(makeResult(true));
+
+      const results = await sim.simulateSequence([
+        makeCall("first"),
+        makeCall("second"),
+        makeCall("third"),
+      ]);
+
+      expect(results).toHaveLength(2);
+      expect(results[1].error).toBe("boom");
+      expect(spy).toHaveBeenCalledTimes(2);
+    });
+
+    it("runs every call when stopOnFailure is false, even after a failure", async () => {
+      const sim = new ContractSimulator("testnet");
+      const spy = jest
+        .spyOn(sim, "simulate")
+        .mockResolvedValueOnce(makeResult(false, "boom"))
+        .mockResolvedValueOnce(makeResult(true));
+
+      const results = await sim.simulateSequence([makeCall("first"), makeCall("second")], {
+        stopOnFailure: false,
+      });
+
+      expect(results).toHaveLength(2);
+      expect(spy).toHaveBeenCalledTimes(2);
+    });
+
+    it("returns an empty array for an empty call list", async () => {
+      const sim = new ContractSimulator("testnet");
+      expect(await sim.simulateSequence([])).toEqual([]);
     });
   });
 });

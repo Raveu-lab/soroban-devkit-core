@@ -7,7 +7,7 @@ import {
   BASE_FEE,
   xdr,
 } from "@stellar/stellar-sdk";
-import { NetworkConfig, SimulationResult, NETWORK_CONFIGS, Network } from "./types";
+import { NetworkConfig, SimulationResult, SimulationCall, NETWORK_CONFIGS, Network } from "./types";
 
 /**
  * ContractSimulator
@@ -59,6 +59,37 @@ export class ContractSimulator {
     } catch (error) {
       return this.normalizeSimulationError(error instanceof Error ? error.message : String(error));
     }
+  }
+
+  /**
+   * Simulate a sequence of independent contract calls, in order.
+   *
+   * Each call is simulated against the current ledger state exactly like a
+   * standalone `simulate()` — this does NOT chain state between steps (a
+   * simulation never commits anything on-chain for a later step to see).
+   * It's for checking that a planned multi-step flow would work — and what
+   * it would cost — before submitting any of it for real.
+   *
+   * By default, stops at the first failing call (the returned array is
+   * shorter than `calls` in that case). Pass `{ stopOnFailure: false }` to
+   * run every call regardless.
+   */
+  async simulateSequence(
+    calls: SimulationCall[],
+    options: { stopOnFailure?: boolean } = {}
+  ): Promise<SimulationResult[]> {
+    const stopOnFailure = options.stopOnFailure ?? true;
+    const results: SimulationResult[] = [];
+
+    for (const call of calls) {
+      const result = await this.simulate(call.contractId, call.method, call.args, call.caller);
+      results.push(result);
+      if (!result.success && stopOnFailure) {
+        break;
+      }
+    }
+
+    return results;
   }
 
   /**

@@ -3,6 +3,8 @@
  * No logic lives here — only type definitions and constants.
  */
 
+import { xdr } from "@stellar/stellar-sdk";
+
 /** Supported Stellar network identifiers */
 export type Network = "mainnet" | "testnet" | "futurenet" | "local";
 
@@ -85,6 +87,14 @@ export interface SimulationResult {
   error?: string;
   /** Raw RPC response for advanced use cases */
   rawResult?: unknown;
+}
+
+/** One call in a sequence passed to ContractSimulator.simulateSequence() */
+export interface SimulationCall {
+  contractId: string;
+  method: string;
+  args: xdr.ScVal[];
+  caller: string;
 }
 
 /** Options for BindingGenerator */
