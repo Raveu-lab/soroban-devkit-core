@@ -37,7 +37,7 @@ describe("ArgEncoder", () => {
   });
 
   it("encodes a C... string as a contract Address", () => {
-    const address = "CCNGTMOQNIF5VFJCHCF6S2CGW473IN76RPAX72YOTGDXC6VDZ4XINN45";
+    const address = "CB5YCY5CYLNO3PTH3OXQKKT6XFXTSNIOYSC5B65XE4ZZE6MVIWGD2LNH";
     const val = encoder.encode(address);
     expect(val.switch()).toBe(xdr.ScValType.scvAddress());
     expect(roundTrip(val)).toBe(address);

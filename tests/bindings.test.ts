@@ -27,7 +27,7 @@ describe("BindingGenerator constructor", () => {
     expect(
       () =>
         new BindingGenerator({
-          contractId: "CCNGTMOQNIF5VFJCHCF6S2CGW473IN76RPAX72YOTGDXC6VDZ4XINN45",
+          contractId: "CB5YCY5CYLNO3PTH3OXQKKT6XFXTSNIOYSC5B65XE4ZZE6MVIWGD2LNH",
           outputDir: "/tmp/does-not-matter",
           network: {
             network: "mainnet",
@@ -41,7 +41,7 @@ describe("BindingGenerator constructor", () => {
 
 describe("BindingGenerator.buildBindings", () => {
   const generator = new BindingGenerator({
-    contractId: "CCNGTMOQNIF5VFJCHCF6S2CGW473IN76RPAX72YOTGDXC6VDZ4XINN45",
+    contractId: "CB5YCY5CYLNO3PTH3OXQKKT6XFXTSNIOYSC5B65XE4ZZE6MVIWGD2LNH",
     outputDir: "/tmp/does-not-matter",
     network: "testnet",
   });
