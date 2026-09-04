@@ -246,7 +246,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, coding standards,
 ## Roadmap
 
 - [ ] Typed struct/union/enum bindings for `BindingGenerator` (currently maps to `any` — needs generating the UDT definitions themselves)
-- [ ] WebSocket/streaming support for `ContractMonitor`
+- [ ] Adaptive polling for `ContractMonitor` — sync `pollingIntervalMs` to actual ledger close cadence instead of a fixed guess (checked and ruled out: real WebSocket/streaming support isn't possible here — Soroban RPC's `getEvents` is plain HTTP JSON-RPC with no subscription endpoint; a raw WS upgrade attempt against `soroban-testnet.stellar.org` returns `405`)
 - [ ] Transaction replay from historical ledger
 
 ---
