@@ -163,22 +163,29 @@ Throws for values with no sensible inferred type (`undefined`, non-integer numbe
 start()
   │
   ├─ getLatestLedger()           → set lastLedger cursor
-  └─ poll() loop
+  └─ schedulePoll() → resolvePollingIntervalMs() → setTimeout(runPollCycle, interval)
        │
-       ├─ server.getEvents({ startLedger: lastLedger + 1, filters })
-       ├─ update lastLedger cursor
-       ├─ for each event → normalize to ContractEvent
-       ├─ EventDecoder.decode(event)   [if decode: true]
-       └─ emit to eventCallbacks[]
+       └─ runPollCycle()
+            ├─ server.getEvents({ startLedger: lastLedger + 1, filters })
+            ├─ update lastLedger cursor
+            ├─ for each event → normalize to ContractEvent
+            ├─ EventDecoder.decode(event)   [if decode: true]
+            ├─ emit to eventCallbacks[]
+            └─ schedulePoll() again
 
 stop()
   └─ clearTimeout, set running = false
 ```
 
+**Adaptive polling interval (`resolvePollingIntervalMs`):** if `options.pollingIntervalMs` is set, it's used as-is — no RPC call. Otherwise, each cycle calls `getLatestLedger()` and calibrates against the *previous* cycle's sample: `msPerLedger = (closeTimeB - closeTimeA) / (sequenceB - sequenceA)`, clamped to `[2000, 30000]`ms (`computeAdaptiveIntervalMs`, pure and testable in isolation). Falls back to a 5000ms default with no prior sample, or if the sequence didn't advance.
+
+Note: `@stellar/stellar-sdk`'s `GetLatestLedgerResponse` type only declares `{ id, sequence, protocolVersion }`, but the live RPC response also includes `closeTime` (unix seconds, as a string) — confirmed against the real testnet endpoint, not just the SDK's `.d.ts`. Accessed via a narrow local cast since the installed SDK version doesn't declare it.
+
 **State:** Stateful. Holds:
 - `running: boolean`
 - `lastLedger: number` — cursor to avoid re-processing events
 - `pollTimer` — timeout handle
+- `lastLedgerSample?: { sequence, closeTimeMs }` — for adaptive interval calibration
 - `eventCallbacks[]` / `errorCallbacks[]` — registered listeners
 
 **Concurrency:** Single polling loop. The next poll only starts after the current one completes (via `.finally()`), preventing overlapping requests.
