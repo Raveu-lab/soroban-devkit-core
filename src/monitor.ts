@@ -18,6 +18,16 @@ export interface MonitorOptions {
 type EventCallback = (event: ContractEvent) => void;
 type ErrorCallback = (error: Error) => void;
 
+/** A single { ledger sequence, close time } sample used to calibrate polling. */
+interface LedgerSample {
+  sequence: number;
+  closeTimeMs: number;
+}
+
+const DEFAULT_POLL_MS = 5000;
+const MIN_POLL_MS = 2000;
+const MAX_POLL_MS = 30000;
+
 /**
  * ContractMonitor
  *
@@ -44,6 +54,7 @@ export class ContractMonitor {
   private running = false;
   private lastLedger = 0;
   private pollTimer?: ReturnType<typeof setTimeout>;
+  private lastLedgerSample?: LedgerSample;
 
   constructor(networkOrConfig: Network | NetworkConfig) {
     const config =
@@ -80,7 +91,7 @@ export class ContractMonitor {
     if (this.running) return;
     this.running = true;
     this.lastLedger = await this.resolveStartLedger();
-    this.schedulePoll();
+    await this.schedulePoll();
   }
 
   /** Stop polling. */
@@ -148,15 +159,70 @@ export class ContractMonitor {
     return this.errorCallbacks.length;
   }
 
-  private schedulePoll(): void {
+  /** Expose the underlying RPC server for testing. */
+  getServer(): SorobanRpc.Server {
+    return this.server;
+  }
+
+  /**
+   * Compute a polling interval, in ms, from two ledger samples — averaging
+   * how long each ledger took to close between them. Clamped to
+   * [MIN_POLL_MS, MAX_POLL_MS] to avoid pathological values from a single
+   * noisy sample. Falls back to DEFAULT_POLL_MS with no previous sample, or
+   * if the sequence didn't advance (shouldn't normally happen).
+   * Public so it can be tested in isolation without a network call.
+   */
+  computeAdaptiveIntervalMs(previous: LedgerSample | undefined, current: LedgerSample): number {
+    if (!previous) return DEFAULT_POLL_MS;
+    const deltaSeq = current.sequence - previous.sequence;
+    if (deltaSeq <= 0) return DEFAULT_POLL_MS;
+    const deltaMs = current.closeTimeMs - previous.closeTimeMs;
+    const msPerLedger = deltaMs / deltaSeq;
+    return Math.min(MAX_POLL_MS, Math.max(MIN_POLL_MS, Math.round(msPerLedger)));
+  }
+
+  /**
+   * Resolve how long to wait before the next poll. If the caller set an
+   * explicit `pollingIntervalMs`, that's used as-is (no RPC call). Otherwise,
+   * calibrates against real ledger close cadence via getLatestLedger().
+   *
+   * Note: @stellar/stellar-sdk's GetLatestLedgerResponse type only declares
+   * { id, sequence, protocolVersion }, but the live RPC response also
+   * includes closeTime (unix seconds, as a string) — confirmed against the
+   * real testnet endpoint. Narrowly typed here since the installed SDK
+   * doesn't declare it.
+   * Public so it can be tested in isolation.
+   */
+  async resolvePollingIntervalMs(): Promise<number> {
+    if (this.options.pollingIntervalMs !== undefined) {
+      return this.options.pollingIntervalMs;
+    }
+
+    const raw = await this.server.getLatestLedger();
+    const closeTime = (raw as unknown as { closeTime?: string }).closeTime;
+    if (closeTime === undefined) return DEFAULT_POLL_MS;
+
+    const current: LedgerSample = {
+      sequence: raw.sequence,
+      closeTimeMs: Number(closeTime) * 1000,
+    };
+    const interval = this.computeAdaptiveIntervalMs(this.lastLedgerSample, current);
+    this.lastLedgerSample = current;
+    return interval;
+  }
+
+  private async schedulePoll(): Promise<void> {
     if (!this.running) return;
-    this.pollTimer = setTimeout(() => this.runPollCycle(), this.options.pollingIntervalMs ?? 5000);
+    const intervalMs = await this.resolvePollingIntervalMs();
+    this.pollTimer = setTimeout(() => this.runPollCycle(), intervalMs);
   }
 
   private runPollCycle(): void {
     this.fetchAndEmitEvents()
       .catch((err) => this.emitError(err))
-      .finally(() => this.schedulePoll());
+      .finally(() => {
+        void this.schedulePoll();
+      });
   }
 
   private async fetchAndEmitEvents(): Promise<void> {

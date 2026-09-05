@@ -227,4 +227,109 @@ describe("ContractMonitor — additional edge cases", () => {
       expect(event.topics).toEqual(["TOPIC1", "TOPIC2"]);
     });
   });
+
+  describe("computeAdaptiveIntervalMs", () => {
+    const monitor = new ContractMonitor("testnet");
+
+    it("returns the 5000ms default with no previous sample", () => {
+      const result = monitor.computeAdaptiveIntervalMs(undefined, {
+        sequence: 100,
+        closeTimeMs: 1_000_000,
+      });
+      expect(result).toBe(5000);
+    });
+
+    it("computes seconds-per-ledger from one ledger advancing over 6000ms", () => {
+      const result = monitor.computeAdaptiveIntervalMs(
+        { sequence: 100, closeTimeMs: 1_000_000 },
+        { sequence: 101, closeTimeMs: 1_006_000 }
+      );
+      expect(result).toBe(6000);
+    });
+
+    it("averages across multiple ledgers advancing", () => {
+      const result = monitor.computeAdaptiveIntervalMs(
+        { sequence: 100, closeTimeMs: 1_000_000 },
+        { sequence: 103, closeTimeMs: 1_015_000 } // 3 ledgers over 15000ms = 5000ms/ledger
+      );
+      expect(result).toBe(5000);
+    });
+
+    it("clamps an implausibly fast cadence to the 2000ms floor", () => {
+      const result = monitor.computeAdaptiveIntervalMs(
+        { sequence: 100, closeTimeMs: 1_000_000 },
+        { sequence: 101, closeTimeMs: 1_000_500 } // 500ms/ledger
+      );
+      expect(result).toBe(2000);
+    });
+
+    it("clamps a stalled/slow cadence to the 30000ms ceiling", () => {
+      const result = monitor.computeAdaptiveIntervalMs(
+        { sequence: 100, closeTimeMs: 1_000_000 },
+        { sequence: 101, closeTimeMs: 1_060_000 } // 60000ms/ledger
+      );
+      expect(result).toBe(30000);
+    });
+
+    it("falls back to the default if the ledger sequence didn't advance", () => {
+      const result = monitor.computeAdaptiveIntervalMs(
+        { sequence: 100, closeTimeMs: 1_000_000 },
+        { sequence: 100, closeTimeMs: 1_010_000 }
+      );
+      expect(result).toBe(5000);
+    });
+  });
+
+  describe("resolvePollingIntervalMs", () => {
+    it("returns the explicit pollingIntervalMs without calling the RPC", async () => {
+      const monitor = new ContractMonitor("testnet");
+      monitor.watch({ pollingIntervalMs: 9000 });
+      const spy = jest.spyOn(monitor.getServer(), "getLatestLedger");
+
+      const result = await monitor.resolvePollingIntervalMs();
+
+      expect(result).toBe(9000);
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    it("calls the RPC and calibrates when pollingIntervalMs is not set", async () => {
+      const monitor = new ContractMonitor("testnet");
+      monitor.watch({});
+      const spy = jest
+        .spyOn(monitor.getServer(), "getLatestLedger")
+        .mockResolvedValueOnce({
+          id: "a",
+          protocolVersion: "21",
+          sequence: 100,
+          closeTime: "1000",
+        } as never)
+        .mockResolvedValueOnce({
+          id: "b",
+          protocolVersion: "21",
+          sequence: 101,
+          closeTime: "1007",
+        } as never);
+
+      const first = await monitor.resolvePollingIntervalMs();
+      const second = await monitor.resolvePollingIntervalMs();
+
+      expect(spy).toHaveBeenCalledTimes(2);
+      expect(first).toBe(5000); // no prior sample yet
+      expect(second).toBe(7000); // (1007 - 1000) * 1000ms / 1 ledger
+    });
+
+    it("falls back to the default if closeTime is absent from the response", async () => {
+      const monitor = new ContractMonitor("testnet");
+      monitor.watch({});
+      jest.spyOn(monitor.getServer(), "getLatestLedger").mockResolvedValueOnce({
+        id: "a",
+        protocolVersion: "21",
+        sequence: 100,
+      } as never);
+
+      const result = await monitor.resolvePollingIntervalMs();
+
+      expect(result).toBe(5000);
+    });
+  });
 });
