@@ -92,23 +92,39 @@ ${methods ? "\n" + methods + "\n" : ""}}
   }
 
   /**
+   * Name of the synthetic parameter each generated method appends to carry
+   * the simulate() caller — distinct from `caller`, which several of this
+   * project's own sample contracts already use as a genuine input name
+   * (e.g. access-control.grant_role, escrow.release). Colliding with a real
+   * input would silently emit TypeScript with a duplicate parameter name.
+   */
+  private static readonly CALLER_PARAM = "callerAddress";
+
+  /**
    * Build one typed method for a single contract function.
    */
   private buildMethod(func: xdr.ScSpecFunctionV0): string {
     const name = func.name().toString();
     const inputs = func.inputs();
+    const argNames = inputs.map((i) => i.name().toString());
+
+    if (argNames.includes(BindingGenerator.CALLER_PARAM)) {
+      throw new Error(
+        `BindingGenerator: contract function "${name}" has a parameter named ` +
+          `"${BindingGenerator.CALLER_PARAM}", which is a reserved parameter name ` +
+          `used internally for the simulate() caller. Rename it in the contract.`
+      );
+    }
 
     const params = inputs.map((i) => `${i.name().toString()}: ${this.scSpecTypeToTs(i.type())}`);
-    params.push("caller: string");
-
-    const argNames = inputs.map((i) => i.name().toString());
+    params.push(`${BindingGenerator.CALLER_PARAM}: string`);
 
     return `  async ${name}(${params.join(", ")}): Promise<SimulationResult> {
     return this.simulator.simulate(
       this.contractId,
       "${name}",
       this.encoder.encodeArgs([${argNames.join(", ")}]),
-      caller
+      ${BindingGenerator.CALLER_PARAM}
     );
   }`;
   }

@@ -61,7 +61,7 @@ describe("BindingGenerator.buildBindings", () => {
     const content = generator.buildBindings("CCNGT...", [spec]);
 
     expect(content).toContain(
-      "async transfer(from: string, to: string, amount: string, caller: string): Promise<SimulationResult>"
+      "async transfer(from: string, to: string, amount: string, callerAddress: string): Promise<SimulationResult>"
     );
     expect(content).toContain('"transfer",');
     expect(content).toContain("this.encoder.encodeArgs([from, to, amount])");
@@ -71,9 +71,32 @@ describe("BindingGenerator.buildBindings", () => {
     const spec = func("get_admin", [], [xdr.ScSpecTypeDef.scSpecTypeAddress()]);
     const content = generator.buildBindings("CCNGT...", [spec]);
 
-    expect(content).toContain("async get_admin(caller: string): Promise<SimulationResult>");
+    expect(content).toContain("async get_admin(callerAddress: string): Promise<SimulationResult>");
     expect(content).toContain('"get_admin",');
     expect(content).toContain("this.encoder.encodeArgs([])");
+  });
+
+  it("does not collide with a contract input literally named 'caller' (common in this project's own contracts, e.g. access-control.grant_role)", () => {
+    const spec = func("grant_role", [
+      input("caller", xdr.ScSpecTypeDef.scSpecTypeAddress()),
+      input("role", xdr.ScSpecTypeDef.scSpecTypeSymbol()),
+      input("to", xdr.ScSpecTypeDef.scSpecTypeAddress()),
+    ]);
+    const content = generator.buildBindings("CCNGT...", [spec]);
+
+    // Would previously emit `caller: string` twice — a TypeScript
+    // "Duplicate identifier" compile error in the generated file.
+    expect(content).toContain(
+      "async grant_role(caller: string, role: string, to: string, callerAddress: string): Promise<SimulationResult>"
+    );
+    expect(content).toContain("this.encoder.encodeArgs([caller, role, to])");
+  });
+
+  it("throws a clear error instead of emitting a broken file when a contract input is named 'callerAddress' too", () => {
+    const spec = func("weird", [input("callerAddress", xdr.ScSpecTypeDef.scSpecTypeAddress())]);
+    expect(() => generator.buildBindings("CCNGT...", [spec])).toThrow(
+      /reserved parameter name/i
+    );
   });
 
   it("generates one method per function, for multiple functions", () => {

@@ -211,6 +211,8 @@ generate()
 
 `network` accepts a custom `NetworkConfig` (not just a `Network` name), for a custom RPC endpoint — like `ContractSimulator`/`ContractMonitor`. Auth headers are the one exception: `Client.from()`'s `ClientOptions` has no headers field, so `NetworkConfig.headers` is silently not used here (it is respected by `ContractSimulator` and `ContractMonitor`).
 
+Each generated method appends a synthetic `callerAddress: string` parameter (the signer passed to `simulate()`), named to avoid colliding with a genuine contract input called `caller` — several contracts in this project's own `contracts/` workspace declare exactly that (e.g. `access-control.grant_role`, `escrow.release`). A collision would otherwise silently emit a TypeScript file with a duplicate parameter name. If a contract input is itself named `callerAddress`, `buildMethod` throws a clear error at generation time instead.
+
 **Current state:** Full for primitive types, collections (`Vec`, `Map`, `Option`, `Tuple`), and `Address`/numeric/string types — each maps to a real TypeScript type. Struct/union/enum UDTs map to `any` (with the type name kept in a comment) since fully typing them means also generating their definitions, which is a separate, larger feature.
 
 **State:** Stateless after construction. Writes to disk as a side effect.
