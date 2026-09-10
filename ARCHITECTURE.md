@@ -83,6 +83,8 @@ simulate(contractId, method, args, caller)
 
 **Error handling:** All RPC errors and simulation failures are caught and returned as `{ success: false, error: string }` — never thrown to the caller.
 
+**Return value:** On success, `result.returnValue` holds the invocation's return value decoded via `EventDecoder.scValToJs` (the RPC response's `result.retval`, an `xdr.ScVal`) — `undefined` if the call wasn't an invocation (no `result` field). `ContractSimulator` holds an `EventDecoder` instance for this rather than duplicating the ScVal→JS type mapping.
+
 **State:** Stateless. A new `SorobanRpc.Server` instance is created per `ContractSimulator` instance.
 
 **`simulateSequence(calls, options?)`:** Calls `simulate()` for each entry in order, collecting results. Each call is independent — a simulation never commits anything on-chain, so there's no real state to chain between steps; this is for checking "would each of these calls succeed, and what would they cost" before submitting any of them for real, not for atomically composing them into one transaction. Stops at the first failing call by default (`{ stopOnFailure: true }`); pass `{ stopOnFailure: false }` to run every call regardless.

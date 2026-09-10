@@ -62,6 +62,7 @@ const result = await simulator.simulate(
 );
 
 if (result.success) {
+  console.log("Return value:", result.returnValue); // decoded, e.g. "1000000" or a plain object
   console.log("CPU instructions:", result.cost.cpuInstructions);
   console.log("Memory bytes:", result.cost.memoryBytes);
 } else {
@@ -148,7 +149,7 @@ const args = encoder.encodeArgs(["GABC...", "1000000", true]);
 | Method | Description |
 |--------|-------------|
 | `new ContractSimulator(network)` | Create a simulator for `mainnet`, `testnet`, `futurenet`, or `local` |
-| `simulate(contractId, method, args, caller)` | Simulate a contract call and return a `SimulationResult` |
+| `simulate(contractId, method, args, caller)` | Simulate a contract call and return a `SimulationResult` — on success, `returnValue` holds the invocation's decoded return value (same type mapping as `EventDecoder`), not just cost/footprint |
 | `simulateSequence(calls, options?)` | Simulate several independent calls in order; stops at the first failure unless `{ stopOnFailure: false }` |
 
 ### `EventDecoder`

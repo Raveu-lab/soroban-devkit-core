@@ -8,6 +8,7 @@ import {
   xdr,
 } from "@stellar/stellar-sdk";
 import { NetworkConfig, SimulationResult, SimulationCall, NETWORK_CONFIGS, Network } from "./types";
+import { EventDecoder } from "./decoder";
 
 /**
  * ContractSimulator
@@ -25,6 +26,7 @@ import { NetworkConfig, SimulationResult, SimulationCall, NETWORK_CONFIGS, Netwo
 export class ContractSimulator {
   private readonly server: SorobanRpc.Server;
   private readonly config: NetworkConfig;
+  private readonly decoder = new EventDecoder();
 
   constructor(networkOrConfig: Network | NetworkConfig) {
     this.config =
@@ -173,6 +175,7 @@ export class ContractSimulator {
     const resources = response.transactionData?.build().resources();
     return {
       success: true,
+      returnValue: response.result ? this.decoder.scValToJs(response.result.retval) : undefined,
       footprint: {
         readBytes: Number(resources?.readBytes() ?? 0),
         writeBytes: Number(resources?.writeBytes() ?? 0),

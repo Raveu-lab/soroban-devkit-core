@@ -62,7 +62,13 @@ export class EventDecoder {
     }
   }
 
-  private scValToJs(val: xdr.ScVal): unknown {
+  /**
+   * Decode a single already-parsed ScVal into a plain JavaScript value.
+   * Same type mapping as decodeData/decodeTopics, for callers that already
+   * have an xdr.ScVal (e.g. a simulation's return value) rather than a
+   * base64 string. Public so it can be reused outside EventDecoder.
+   */
+  scValToJs(val: xdr.ScVal): unknown {
     const type = val.switch();
 
     switch (type) {

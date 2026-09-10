@@ -185,6 +185,43 @@ describe("ContractSimulator — additional edge cases", () => {
       });
       expect(result.cost).toEqual({ cpuInstructions: "42", memoryBytes: "84" });
     });
+
+    it("decodes the real return value from response.result.retval, matching what EventDecoder would produce", () => {
+      const sim = new ContractSimulator("testnet");
+
+      const response = {
+        id: "1",
+        latestLedger: 100,
+        events: [],
+        _parsed: true,
+        transactionData: new SorobanDataBuilder().setResources(1000, 200, 300),
+        minResourceFee: "999999",
+        cost: { cpuInsns: "42", memBytes: "84" },
+        result: { auth: [], retval: xdr.ScVal.scvI32(42) },
+      } as unknown as import("@stellar/stellar-sdk").SorobanRpc.Api.SimulateTransactionSuccessResponse;
+
+      const result = sim.normalizeSuccessResponse(response);
+
+      expect(result.returnValue).toBe(42);
+    });
+
+    it("leaves returnValue undefined when the simulation wasn't an invocation (no result field)", () => {
+      const sim = new ContractSimulator("testnet");
+
+      const response = {
+        id: "1",
+        latestLedger: 100,
+        events: [],
+        _parsed: true,
+        transactionData: new SorobanDataBuilder().setResources(1000, 200, 300),
+        minResourceFee: "999999",
+        cost: { cpuInsns: "42", memBytes: "84" },
+      } as unknown as import("@stellar/stellar-sdk").SorobanRpc.Api.SimulateTransactionSuccessResponse;
+
+      const result = sim.normalizeSuccessResponse(response);
+
+      expect(result.returnValue).toBeUndefined();
+    });
   });
 
   describe("simulateSequence", () => {
