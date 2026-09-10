@@ -185,6 +185,8 @@ If `pollingIntervalMs` is omitted, the interval isn't a fixed guess — each pol
 | `encode(value)` | Encode a single plain value into an `xdr.ScVal`, inferring its type |
 | `encodeArgs(values)` | Encode an array of plain values, in order |
 
+**Known limitation:** integers always encode as the signed variant (`scvI32`/`scvI128`) — there's no contract spec to tell `ArgEncoder` a parameter is actually `u32`/`u64`/`u128`. Calling a function with an unsigned parameter (common for ids/counts/thresholds) fails with a cryptic host VM trap, not a clear error. Encode those arguments by hand with `xdr.ScVal.scvU32(...)` etc. in the meantime. See [Roadmap](#roadmap).
+
 ---
 
 ## Supported Networks
@@ -250,6 +252,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, coding standards,
 
 - [ ] Typed struct/union/enum bindings for `BindingGenerator` (currently maps to `any` — needs generating the UDT definitions themselves)
 - [ ] Transaction replay from historical ledger
+- [ ] `ArgEncoder` support for unsigned/wider integer types (`u32`/`u64`/`u128`) — currently always encodes the signed variant since there's no contract spec to consult; needs either an optional spec lookup or an explicit type-hint input shape
 
 ---
 

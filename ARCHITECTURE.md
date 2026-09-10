@@ -152,6 +152,8 @@ encode(value)
 
 Throws for values with no sensible inferred type (`undefined`, non-integer numbers, numbers outside i32 range, functions).
 
+**Known limitation — unsigned/wider integer types:** without a contract spec, `ArgEncoder` cannot tell a `u32` parameter from an `i32` one (both accept the same plain JS number), or a `u64`/`u128` from an `i128` one — it always picks the signed variant. Soroban's host requires an exact `ScVal` type match, so calling a function whose declared parameter type is unsigned (very common for ids, counts, and thresholds — see e.g. `dao-voting.get_proposal(id: u32)` or `multisig.initialize(threshold: u32)` in `soroban-devkit-contracts`) fails with a `WasmVm`/`UnreachableCodeReached` host trap rather than a clear encoding error. Confirmed live against testnet. Encode such an argument by hand with the Stellar SDK's `xdr.ScVal.scvU32(...)` etc. instead of `ArgEncoder` until this is addressed (it needs either an optional contract-spec lookup or an explicit type-hint input shape — a larger change than a single fix).
+
 **State:** Stateless. Safe to use as a singleton.
 
 ---
