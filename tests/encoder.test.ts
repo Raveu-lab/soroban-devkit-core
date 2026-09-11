@@ -82,6 +82,74 @@ describe("ArgEncoder", () => {
     expect(roundTrip(val)).toEqual({ a: 1, b: 2 });
   });
 
+  describe("unsigned integer hints ($u32/$u64/$u128)", () => {
+    it("encodes { $u32: n } as scvU32, not the default signed i32", () => {
+      const val = encoder.encode({ $u32: 42 });
+      expect(val.switch()).toBe(xdr.ScValType.scvU32());
+      expect(roundTrip(val)).toBe(42);
+    });
+
+    it("encodes { $u32: n } up to u32::MAX, which would overflow i32", () => {
+      const val = encoder.encode({ $u32: 4_294_967_295 });
+      expect(roundTrip(val)).toBe(4_294_967_295);
+    });
+
+    it("rejects a negative $u32 value", () => {
+      expect(() => encoder.encode({ $u32: -1 })).toThrow(/u32/);
+    });
+
+    it("rejects a $u32 value above u32::MAX", () => {
+      expect(() => encoder.encode({ $u32: 4_294_967_296 })).toThrow(/u32/);
+    });
+
+    it("encodes { $u64: n } as scvU64 from a plain number", () => {
+      const val = encoder.encode({ $u64: 1_000_000 });
+      expect(val.switch()).toBe(xdr.ScValType.scvU64());
+      expect(roundTrip(val)).toBe("1000000");
+    });
+
+    it("encodes { $u64: \"n\" } as scvU64 from a digit string, for values beyond safe-integer range", () => {
+      const val = encoder.encode({ $u64: "18446744073709551615" }); // u64::MAX
+      expect(roundTrip(val)).toBe("18446744073709551615");
+    });
+
+    it("rejects a negative $u64 value", () => {
+      expect(() => encoder.encode({ $u64: "-1" })).toThrow(/u64/);
+    });
+
+    it("rejects a $u64 value above u64::MAX", () => {
+      expect(() => encoder.encode({ $u64: "18446744073709551616" })).toThrow(/u64/);
+    });
+
+    it("encodes { $u128: \"n\" } as scvU128 from a digit string", () => {
+      const val = encoder.encode({ $u128: "340282366920938463463374607431768211455" }); // u128::MAX
+      expect(val.switch()).toBe(xdr.ScValType.scvU128());
+      expect(roundTrip(val)).toBe("340282366920938463463374607431768211455");
+    });
+
+    it("rejects a negative $u128 value", () => {
+      expect(() => encoder.encode({ $u128: "-1" })).toThrow(/u128/);
+    });
+
+    it("rejects a $u128 value above u128::MAX", () => {
+      expect(() =>
+        encoder.encode({ $u128: "340282366920938463463374607431768211456" })
+      ).toThrow(/u128/);
+    });
+
+    it("does not hijack an ordinary map whose only key happens to not match a hint", () => {
+      const val = encoder.encode({ amount: 5 });
+      expect(val.switch()).toBe(xdr.ScValType.scvMap());
+      expect(roundTrip(val)).toEqual({ amount: 5 });
+    });
+
+    it("does not hijack a map with a hint-like key alongside other keys", () => {
+      const val = encoder.encode({ u32: 5, other: 1 });
+      expect(val.switch()).toBe(xdr.ScValType.scvMap());
+      expect(roundTrip(val)).toEqual({ u32: 5, other: 1 });
+    });
+  });
+
   it("encodeArgs maps encode over an array", () => {
     const vals = encoder.encodeArgs([
       "GACP4WS6CA6GPH7NWEPY6AKRTNQSRAL7KB2SDYEKNN7YMMCYGKKI2HE4",
