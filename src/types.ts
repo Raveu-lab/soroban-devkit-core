@@ -74,14 +74,15 @@ export interface SimulationResult {
   returnValue?: unknown;
   /** Estimated resource usage */
   footprint: {
-    readBytes: number;
+    diskReadBytes: number;
     writeBytes: number;
     instructions: number;
   };
-  /** Human-readable cost estimates */
+  /** Estimated cost. cpuInstructions/memoryBytes were removed from the RPC
+   * response upstream — minResourceFee (stroops) is what the protocol
+   * actually reports now. */
   cost: {
-    cpuInstructions: string;
-    memoryBytes: string;
+    minResourceFee: string;
   };
   /** Error message when success is false */
   error?: string;

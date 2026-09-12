@@ -1,6 +1,6 @@
 import {
   Contract,
-  SorobanRpc,
+  rpc,
   Transaction,
   TransactionBuilder,
   Account,
@@ -20,11 +20,11 @@ import { EventDecoder } from "./decoder";
  * ```ts
  * const sim = new ContractSimulator("testnet");
  * const result = await sim.simulate("CXXXXX", "transfer", [from, to, amount], "GXXXXX");
- * console.log(result.cost.cpuInstructions);
+ * console.log(result.cost.minResourceFee);
  * ```
  */
 export class ContractSimulator {
-  private readonly server: SorobanRpc.Server;
+  private readonly server: rpc.Server;
   private readonly config: NetworkConfig;
   private readonly decoder = new EventDecoder();
 
@@ -32,7 +32,7 @@ export class ContractSimulator {
     this.config =
       typeof networkOrConfig === "string" ? NETWORK_CONFIGS[networkOrConfig] : networkOrConfig;
 
-    this.server = new SorobanRpc.Server(this.config.rpcUrl, {
+    this.server = new rpc.Server(this.config.rpcUrl, {
       allowHttp: this.config.network === "local",
       headers: this.config.headers,
     });
@@ -131,8 +131,8 @@ export class ContractSimulator {
     return {
       success: false,
       error: errorMessage,
-      footprint: { readBytes: 0, writeBytes: 0, instructions: 0 },
-      cost: { cpuInstructions: "0", memoryBytes: "0" },
+      footprint: { diskReadBytes: 0, writeBytes: 0, instructions: 0 },
+      cost: { minResourceFee: "0" },
     };
   }
 
@@ -148,20 +148,20 @@ export class ContractSimulator {
    * Normalize a raw RPC simulation response into a SimulationResult.
    */
   private normalizeResponse(
-    response: SorobanRpc.Api.SimulateTransactionResponse
+    response: rpc.Api.SimulateTransactionResponse
   ): SimulationResult {
-    if (SorobanRpc.Api.isSimulationError(response)) {
+    if (rpc.Api.isSimulationError(response)) {
       return this.normalizeSimulationError(response.error);
     }
 
-    if (SorobanRpc.Api.isSimulationRestore(response)) {
+    if (rpc.Api.isSimulationRestore(response)) {
       return this.normalizeSimulationError(
         "Contract data needs restoration before this call can succeed."
       );
     }
 
     return this.normalizeSuccessResponse(
-      response as SorobanRpc.Api.SimulateTransactionSuccessResponse
+      response as rpc.Api.SimulateTransactionSuccessResponse
     );
   }
 
@@ -170,20 +170,19 @@ export class ContractSimulator {
    * Public so it can be tested in isolation without a network call.
    */
   normalizeSuccessResponse(
-    response: SorobanRpc.Api.SimulateTransactionSuccessResponse
+    response: rpc.Api.SimulateTransactionSuccessResponse
   ): SimulationResult {
     const resources = response.transactionData?.build().resources();
     return {
       success: true,
       returnValue: response.result ? this.decoder.scValToJs(response.result.retval) : undefined,
       footprint: {
-        readBytes: Number(resources?.readBytes() ?? 0),
+        diskReadBytes: Number(resources?.diskReadBytes() ?? 0),
         writeBytes: Number(resources?.writeBytes() ?? 0),
         instructions: Number(resources?.instructions() ?? 0),
       },
       cost: {
-        cpuInstructions: response.cost?.cpuInsns?.toString() ?? "0",
-        memoryBytes: response.cost?.memBytes?.toString() ?? "0",
+        minResourceFee: response.minResourceFee?.toString() ?? "0",
       },
       rawResult: response,
     };

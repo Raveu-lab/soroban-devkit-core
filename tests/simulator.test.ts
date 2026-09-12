@@ -79,8 +79,7 @@ describe("ContractSimulator", () => {
     it("failed result always has zero cost fields", () => {
       const sim = new ContractSimulator("testnet");
       const result = sim.normalizeSimulationError("timeout");
-      expect(result.cost.cpuInstructions).toBe("0");
-      expect(result.cost.memoryBytes).toBe("0");
+      expect(result.cost.minResourceFee).toBe("0");
     });
   });
 
@@ -155,12 +154,12 @@ describe("ContractSimulator — additional edge cases", () => {
     it("returns zero footprint values", () => {
       const sim = new ContractSimulator("testnet");
       const result = sim.normalizeSimulationError("err");
-      expect(result.footprint).toEqual({ readBytes: 0, writeBytes: 0, instructions: 0 });
+      expect(result.footprint).toEqual({ diskReadBytes: 0, writeBytes: 0, instructions: 0 });
     });
   });
 
   describe("normalizeSuccessResponse", () => {
-    it("maps real readBytes/writeBytes/instructions from the transaction data, not minResourceFee", () => {
+    it("maps real diskReadBytes/writeBytes/instructions from the transaction data, and minResourceFee for cost", () => {
       const sim = new ContractSimulator("testnet");
 
       const transactionData = new SorobanDataBuilder().setResources(1000, 200, 300);
@@ -171,19 +170,18 @@ describe("ContractSimulator — additional edge cases", () => {
         events: [],
         _parsed: true,
         transactionData,
-        minResourceFee: "999999", // deliberately different from readBytes, to catch the mixup
-        cost: { cpuInsns: "42", memBytes: "84" },
-      } as unknown as import("@stellar/stellar-sdk").SorobanRpc.Api.SimulateTransactionSuccessResponse;
+        minResourceFee: "999999",
+      } as unknown as import("@stellar/stellar-sdk").rpc.Api.SimulateTransactionSuccessResponse;
 
       const result = sim.normalizeSuccessResponse(response);
 
       expect(result.success).toBe(true);
       expect(result.footprint).toEqual({
-        readBytes: 200,
+        diskReadBytes: 200,
         writeBytes: 300,
         instructions: 1000,
       });
-      expect(result.cost).toEqual({ cpuInstructions: "42", memoryBytes: "84" });
+      expect(result.cost).toEqual({ minResourceFee: "999999" });
     });
 
     it("decodes the real return value from response.result.retval, matching what EventDecoder would produce", () => {
@@ -198,7 +196,7 @@ describe("ContractSimulator — additional edge cases", () => {
         minResourceFee: "999999",
         cost: { cpuInsns: "42", memBytes: "84" },
         result: { auth: [], retval: xdr.ScVal.scvI32(42) },
-      } as unknown as import("@stellar/stellar-sdk").SorobanRpc.Api.SimulateTransactionSuccessResponse;
+      } as unknown as import("@stellar/stellar-sdk").rpc.Api.SimulateTransactionSuccessResponse;
 
       const result = sim.normalizeSuccessResponse(response);
 
@@ -216,7 +214,7 @@ describe("ContractSimulator — additional edge cases", () => {
         transactionData: new SorobanDataBuilder().setResources(1000, 200, 300),
         minResourceFee: "999999",
         cost: { cpuInsns: "42", memBytes: "84" },
-      } as unknown as import("@stellar/stellar-sdk").SorobanRpc.Api.SimulateTransactionSuccessResponse;
+      } as unknown as import("@stellar/stellar-sdk").rpc.Api.SimulateTransactionSuccessResponse;
 
       const result = sim.normalizeSuccessResponse(response);
 
@@ -229,8 +227,8 @@ describe("ContractSimulator — additional edge cases", () => {
       return {
         success,
         error,
-        footprint: { readBytes: 0, writeBytes: 0, instructions: 0 },
-        cost: { cpuInstructions: "0", memoryBytes: "0" },
+        footprint: { diskReadBytes: 0, writeBytes: 0, instructions: 0 },
+        cost: { minResourceFee: "0" },
       };
     }
 

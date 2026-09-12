@@ -40,7 +40,7 @@ Developers coming from Ethereum have Hardhat, Foundry, and Ethers. They get simu
 npm install @soroban-devkit/core
 ```
 
-Requires Node.js >= 18.
+Requires Node.js >= 22.12.0 (required by `@stellar/stellar-sdk` 17.x).
 
 ---
 
@@ -63,8 +63,8 @@ const result = await simulator.simulate(
 
 if (result.success) {
   console.log("Return value:", result.returnValue); // decoded, e.g. "1000000" or a plain object
-  console.log("CPU instructions:", result.cost.cpuInstructions);
-  console.log("Memory bytes:", result.cost.memoryBytes);
+  console.log("Min resource fee (stroops):", result.cost.minResourceFee);
+  console.log("Instructions:", result.footprint.instructions);
 } else {
   console.error("Simulation failed:", result.error);
 }

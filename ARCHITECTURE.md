@@ -38,7 +38,7 @@ Everything is stateless except `ContractMonitor`, which holds an internal pollin
                         │ uses
 ┌───────────────────────▼─────────────────────────────────┐
 │              @stellar/stellar-sdk                        │
-│         SorobanRpc | xdr | Contract | Account            │
+│              rpc | xdr | Contract | Account               │
 └───────────────────────┬─────────────────────────────────┘
                         │ HTTP/JSON-RPC
 ┌───────────────────────▼─────────────────────────────────┐
@@ -85,7 +85,9 @@ simulate(contractId, method, args, caller)
 
 **Return value:** On success, `result.returnValue` holds the invocation's return value decoded via `EventDecoder.scValToJs` (the RPC response's `result.retval`, an `xdr.ScVal`) — `undefined` if the call wasn't an invocation (no `result` field). `ContractSimulator` holds an `EventDecoder` instance for this rather than duplicating the ScVal→JS type mapping.
 
-**State:** Stateless. A new `SorobanRpc.Server` instance is created per `ContractSimulator` instance.
+**State:** Stateless. A new `rpc.Server` instance is created per `ContractSimulator` instance.
+
+**Cost/footprint fields:** `footprint` is `{ diskReadBytes, writeBytes, instructions }` from `response.transactionData.build().resources()`. `cost` is `{ minResourceFee }` (stroops, from `response.minResourceFee`) — the RPC response's old `cost.cpuInsns`/`cost.memBytes` fields (and `resources().readBytes()`, renamed `diskReadBytes()`) no longer exist as of the current Soroban RPC protocol; confirmed against a live testnet response, not just the SDK's types.
 
 **`simulateSequence(calls, options?)`:** Calls `simulate()` for each entry in order, collecting results. Each call is independent — a simulation never commits anything on-chain, so there's no real state to chain between steps; this is for checking "would each of these calls succeed, and what would they cost" before submitting any of them for real, not for atomically composing them into one transaction. Stops at the first failing call by default (`{ stopOnFailure: true }`); pass `{ stopOnFailure: false }` to run every call regardless.
 
@@ -184,7 +186,7 @@ stop()
 
 **Adaptive polling interval (`resolvePollingIntervalMs`):** if `options.pollingIntervalMs` is set, it's used as-is — no RPC call. Otherwise, each cycle calls `getLatestLedger()` and calibrates against the *previous* cycle's sample: `msPerLedger = (closeTimeB - closeTimeA) / (sequenceB - sequenceA)`, clamped to `[2000, 30000]`ms (`computeAdaptiveIntervalMs`, pure and testable in isolation). Falls back to a 5000ms default with no prior sample, or if the sequence didn't advance.
 
-Note: `@stellar/stellar-sdk`'s `GetLatestLedgerResponse` type only declares `{ id, sequence, protocolVersion }`, but the live RPC response also includes `closeTime` (unix seconds, as a string) — confirmed against the real testnet endpoint, not just the SDK's `.d.ts`. Accessed via a narrow local cast since the installed SDK version doesn't declare it.
+`GetLatestLedgerResponse.closeTime` (unix seconds, as a string) is properly declared as of `@stellar/stellar-sdk` 15+ — earlier versions' types omitted it despite the live RPC response always including it, which required a narrow local cast; no longer needed after the 2026-09-12 SDK upgrade.
 
 **State:** Stateful. Holds:
 - `running: boolean`

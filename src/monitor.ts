@@ -1,4 +1,4 @@
-import { SorobanRpc, xdr } from "@stellar/stellar-sdk";
+import { rpc, xdr } from "@stellar/stellar-sdk";
 import { ContractEvent, Network, NETWORK_CONFIGS, NetworkConfig } from "./types";
 import { EventDecoder } from "./decoder";
 
@@ -46,7 +46,7 @@ const MAX_POLL_MS = 30000;
  * ```
  */
 export class ContractMonitor {
-  private readonly server: SorobanRpc.Server;
+  private readonly server: rpc.Server;
   private readonly decoder: EventDecoder;
   private options: MonitorOptions = {};
   private eventCallbacks: EventCallback[] = [];
@@ -60,7 +60,7 @@ export class ContractMonitor {
     const config =
       typeof networkOrConfig === "string" ? NETWORK_CONFIGS[networkOrConfig] : networkOrConfig;
 
-    this.server = new SorobanRpc.Server(config.rpcUrl, {
+    this.server = new rpc.Server(config.rpcUrl, {
       allowHttp: config.network === "local",
       headers: config.headers,
     });
@@ -104,10 +104,10 @@ export class ContractMonitor {
    * Build the RPC event filters from current watch options.
    * Public so it can be tested in isolation.
    */
-  buildEventFilters(): SorobanRpc.Api.EventFilter[] {
+  buildEventFilters(): rpc.Api.EventFilter[] {
     if (!this.options.contractIds?.length) return [];
 
-    const filter: SorobanRpc.Api.EventFilter = {
+    const filter: rpc.Api.EventFilter = {
       type: "contract",
       contractIds: this.options.contractIds,
     };
@@ -160,7 +160,7 @@ export class ContractMonitor {
   }
 
   /** Expose the underlying RPC server for testing. */
-  getServer(): SorobanRpc.Server {
+  getServer(): rpc.Server {
     return this.server;
   }
 
@@ -186,11 +186,6 @@ export class ContractMonitor {
    * explicit `pollingIntervalMs`, that's used as-is (no RPC call). Otherwise,
    * calibrates against real ledger close cadence via getLatestLedger().
    *
-   * Note: @stellar/stellar-sdk's GetLatestLedgerResponse type only declares
-   * { id, sequence, protocolVersion }, but the live RPC response also
-   * includes closeTime (unix seconds, as a string) — confirmed against the
-   * real testnet endpoint. Narrowly typed here since the installed SDK
-   * doesn't declare it.
    * Public so it can be tested in isolation.
    */
   async resolvePollingIntervalMs(): Promise<number> {
@@ -199,12 +194,11 @@ export class ContractMonitor {
     }
 
     const raw = await this.server.getLatestLedger();
-    const closeTime = (raw as unknown as { closeTime?: string }).closeTime;
-    if (closeTime === undefined) return DEFAULT_POLL_MS;
+    if (raw.closeTime === undefined) return DEFAULT_POLL_MS;
 
     const current: LedgerSample = {
       sequence: raw.sequence,
-      closeTimeMs: Number(closeTime) * 1000,
+      closeTimeMs: Number(raw.closeTime) * 1000,
     };
     const interval = this.computeAdaptiveIntervalMs(this.lastLedgerSample, current);
     this.lastLedgerSample = current;
