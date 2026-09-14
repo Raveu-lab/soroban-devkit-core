@@ -1,3 +1,4 @@
+import * as path from "path";
 import { xdr } from "@stellar/stellar-sdk";
 import { BindingGenerator } from "../src/bindings";
 
@@ -36,6 +37,26 @@ describe("BindingGenerator constructor", () => {
           },
         })
     ).not.toThrow();
+  });
+});
+
+describe("BindingGenerator.outputPath", () => {
+  it("returns the exact path generate() writes to, so callers don't have to re-derive the filename convention", () => {
+    const generator = new BindingGenerator({
+      contractId: "CB5YCY5CYLNO3PTH3OXQKKT6XFXTSNIOYSC5B65XE4ZZE6MVIWGD2LNH",
+      outputDir: "/tmp/does-not-matter",
+      network: "testnet",
+    });
+    expect(generator.outputPath()).toBe("/tmp/does-not-matter/CB5YCY5C_bindings.ts");
+  });
+
+  it("resolves a relative outputDir the same way write() does", () => {
+    const generator = new BindingGenerator({
+      contractId: "CB5YCY5CYLNO3PTH3OXQKKT6XFXTSNIOYSC5B65XE4ZZE6MVIWGD2LNH",
+      outputDir: "./generated",
+      network: "testnet",
+    });
+    expect(generator.outputPath()).toBe(path.resolve("./generated", "CB5YCY5C_bindings.ts"));
   });
 });
 

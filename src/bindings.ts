@@ -221,12 +221,22 @@ ${methods ? "\n" + methods + "\n" : ""}}
     }
   }
 
+  /**
+   * The exact path generate() writes to. Public so callers (e.g. the CLI's
+   * success message) don't have to re-derive the filename convention
+   * themselves — a second, independent copy of this logic could silently
+   * drift out of sync with what actually gets written.
+   */
+  outputPath(): string {
+    const dir = path.resolve(this.options.outputDir);
+    return path.join(dir, `${this.options.contractId.slice(0, 8)}_bindings.ts`);
+  }
+
   private write(content: string): void {
     const dir = path.resolve(this.options.outputDir);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    const filename = path.join(dir, `${this.options.contractId.slice(0, 8)}_bindings.ts`);
-    fs.writeFileSync(filename, content, "utf-8");
+    fs.writeFileSync(this.outputPath(), content, "utf-8");
   }
 }
