@@ -178,6 +178,8 @@ If `pollingIntervalMs` is omitted, the interval isn't a fixed guess — each pol
 | `new BindingGenerator(options)` | Configure contract ID, output directory, network |
 | `generate()` | Fetch the contract spec and write TypeScript bindings to disk |
 
+Generated calls automatically use `ArgEncoder`'s `$u32`/`$u64`/`$u128` hints for arguments the contract spec declares as unsigned — you don't need to wrap them yourself the way you would calling `ArgEncoder` directly.
+
 ### `ArgEncoder`
 
 | Method | Description |

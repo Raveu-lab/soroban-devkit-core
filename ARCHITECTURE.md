@@ -220,6 +220,8 @@ generate()
 
 Each generated method appends a synthetic `callerAddress: string` parameter (the signer passed to `simulate()`), named to avoid colliding with a genuine contract input called `caller` — several contracts in this project's own `contracts/` workspace declare exactly that (e.g. `access-control.grant_role`, `escrow.release`). A collision would otherwise silently emit a TypeScript file with a duplicate parameter name. If a contract input is itself named `callerAddress`, `buildMethod` throws a clear error at generation time instead.
 
+`argExpression(argName, type)` wraps a `u32`/`u64`/`u128`-typed argument in `ArgEncoder`'s `$u32`/`$u64`/`$u128` hint before passing it to `encodeArgs()` — the spec is the one place this generator actually knows an argument's true signedness, so it should never rely on `ArgEncoder`'s default (signed) inference the way hand-written code has to. Without this, a generated binding for any real function taking a `u32`/`u64`/`u128` (ids, counts, thresholds — most functions in `soroban-devkit-contracts`) would silently produce a call that traps. Verified by compiling and running actual generated bindings against a live deployed contract (`dao-voting.get_proposal`), not just the unit tests.
+
 **Current state:** Full for primitive types, collections (`Vec`, `Map`, `Option`, `Tuple`), and `Address`/numeric/string types — each maps to a real TypeScript type. Struct/union/enum UDTs map to `any` (with the type name kept in a comment) since fully typing them means also generating their definitions, which is a separate, larger feature.
 
 **State:** Stateless after construction. Writes to disk as a side effect.

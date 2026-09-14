@@ -99,6 +99,52 @@ describe("BindingGenerator.buildBindings", () => {
     );
   });
 
+  describe("unsigned integer args", () => {
+    it("wraps a u32 arg in the $u32 hint, so ArgEncoder doesn't default it to scvI32", () => {
+      const spec = func("get_proposal", [input("proposal_id", xdr.ScSpecTypeDef.scSpecTypeU32())]);
+      const content = generator.buildBindings("CCNGT...", [spec]);
+
+      // Without the hint, ArgEncoder would infer scvI32 for a plain number,
+      // and a real u32-typed contract parameter would reject it with an
+      // opaque host trap — confirmed against a real deployed contract.
+      expect(content).toContain("this.encoder.encodeArgs([{ $u32: proposal_id }])");
+    });
+
+    it("wraps a u64 arg in the $u64 hint", () => {
+      const spec = func("f", [input("count", xdr.ScSpecTypeDef.scSpecTypeU64())]);
+      const content = generator.buildBindings("CCNGT...", [spec]);
+      expect(content).toContain("this.encoder.encodeArgs([{ $u64: count }])");
+    });
+
+    it("wraps a u128 arg in the $u128 hint", () => {
+      const spec = func("f", [input("total", xdr.ScSpecTypeDef.scSpecTypeU128())]);
+      const content = generator.buildBindings("CCNGT...", [spec]);
+      expect(content).toContain("this.encoder.encodeArgs([{ $u128: total }])");
+    });
+
+    it("does not wrap a signed i32/i64/i128 arg — ArgEncoder's default already matches", () => {
+      const spec = func("f", [
+        input("a", xdr.ScSpecTypeDef.scSpecTypeI32()),
+        input("b", xdr.ScSpecTypeDef.scSpecTypeI64()),
+        input("c", xdr.ScSpecTypeDef.scSpecTypeI128()),
+      ]);
+      const content = generator.buildBindings("CCNGT...", [spec]);
+      expect(content).toContain("this.encoder.encodeArgs([a, b, c])");
+    });
+
+    it("mixes wrapped and unwrapped args in the same call, preserving order", () => {
+      const spec = func("vote", [
+        input("proposal_id", xdr.ScSpecTypeDef.scSpecTypeU32()),
+        input("voter", xdr.ScSpecTypeDef.scSpecTypeAddress()),
+        input("support", xdr.ScSpecTypeDef.scSpecTypeBool()),
+      ]);
+      const content = generator.buildBindings("CCNGT...", [spec]);
+      expect(content).toContain(
+        "this.encoder.encodeArgs([{ $u32: proposal_id }, voter, support])"
+      );
+    });
+  });
+
   it("generates one method per function, for multiple functions", () => {
     const content = generator.buildBindings("CCNGT...", [
       func("mint", [input("to", xdr.ScSpecTypeDef.scSpecTypeAddress())]),

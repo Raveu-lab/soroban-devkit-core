@@ -119,14 +119,38 @@ ${methods ? "\n" + methods + "\n" : ""}}
     const params = inputs.map((i) => `${i.name().toString()}: ${this.scSpecTypeToTs(i.type())}`);
     params.push(`${BindingGenerator.CALLER_PARAM}: string`);
 
+    const argExpressions = inputs.map((i) => this.argExpression(i.name().toString(), i.type()));
+
     return `  async ${name}(${params.join(", ")}): Promise<SimulationResult> {
     return this.simulator.simulate(
       this.contractId,
       "${name}",
-      this.encoder.encodeArgs([${argNames.join(", ")}]),
+      this.encoder.encodeArgs([${argExpressions.join(", ")}]),
       ${BindingGenerator.CALLER_PARAM}
     );
   }`;
+  }
+
+  /**
+   * Build the expression passed to encodeArgs() for one argument. A plain
+   * number/digit string is ambiguous between the signed and unsigned ScVal
+   * variant — ArgEncoder always defaults to signed, which would send scvI32
+   * for a real u32 parameter and get rejected with an opaque host trap
+   * (confirmed against a live deployed contract). The on-chain spec tells
+   * us the true type here, so wrap unsigned args in ArgEncoder's $u32/$u64/
+   * $u128 hint instead of passing the raw name through.
+   */
+  private argExpression(argName: string, type: xdr.ScSpecTypeDef): string {
+    switch (type.switch()) {
+      case xdr.ScSpecType.scSpecTypeU32():
+        return `{ $u32: ${argName} }`;
+      case xdr.ScSpecType.scSpecTypeU64():
+        return `{ $u64: ${argName} }`;
+      case xdr.ScSpecType.scSpecTypeU128():
+        return `{ $u128: ${argName} }`;
+      default:
+        return argName;
+    }
   }
 
   /**
