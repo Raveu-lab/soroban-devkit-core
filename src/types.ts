@@ -106,6 +106,4 @@ export interface BindingGeneratorOptions {
   outputDir: string;
   /** Network the contract is deployed on — a name, or a full config for a custom RPC endpoint/auth headers */
   network: Network | NetworkConfig;
-  /** Generate a full SDK wrapper class around the bindings (default: true) */
-  generateWrapper?: boolean;
 }
