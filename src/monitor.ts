@@ -219,7 +219,19 @@ export class ContractMonitor {
       });
   }
 
-  private async fetchAndEmitEvents(): Promise<void> {
+  /**
+   * Fetch new events since lastLedger and emit each one. Public so it can
+   * be tested in isolation without a network call.
+   *
+   * Each event is processed and emitted independently — one throwing event
+   * callback must not prevent the rest of the batch from being delivered.
+   * lastLedger is advanced before the loop runs (it reflects what the RPC
+   * reported, not local processing success), so a batch that isn't fully
+   * delivered here can't be recovered by a later poll either; isolating
+   * each event is what keeps one bad callback from taking down its
+   * unrelated siblings in the same batch.
+   */
+  async fetchAndEmitEvents(): Promise<void> {
     const filters = this.buildEventFilters();
     const response = await this.server.getEvents({
       startLedger: this.lastLedger + 1,
@@ -229,17 +241,21 @@ export class ContractMonitor {
     if (response.events.length > 0) {
       this.lastLedger = Math.max(...response.events.map((e) => e.ledger));
       for (const raw of response.events) {
-        const event: ContractEvent = {
-          ledger: raw.ledger,
-          ledgerClosedAt: raw.ledgerClosedAt,
-          contractId: raw.contractId?.toString() ?? "",
-          id: raw.id,
-          type: raw.type as ContractEvent["type"],
-          topics: raw.topic.map((t) => t.toXDR("base64")),
-          data: raw.value.toXDR("base64"),
-        };
-        const final = this.options.decode !== false ? this.decoder.decode(event) : event;
-        this.emitEvent(final);
+        try {
+          const event: ContractEvent = {
+            ledger: raw.ledger,
+            ledgerClosedAt: raw.ledgerClosedAt,
+            contractId: raw.contractId?.toString() ?? "",
+            id: raw.id,
+            type: raw.type as ContractEvent["type"],
+            topics: raw.topic.map((t) => t.toXDR("base64")),
+            data: raw.value.toXDR("base64"),
+          };
+          const final = this.options.decode !== false ? this.decoder.decode(event) : event;
+          this.emitEvent(final);
+        } catch (err) {
+          this.emitError(err);
+        }
       }
     }
   }

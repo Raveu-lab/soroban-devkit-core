@@ -332,4 +332,48 @@ describe("ContractMonitor — additional edge cases", () => {
       expect(result).toBe(5000);
     });
   });
+
+  describe("fetchAndEmitEvents", () => {
+    function fakeRawEvent(ledger: number) {
+      return {
+        ledger,
+        ledgerClosedAt: "2024-01-01T00:00:00Z",
+        contractId: { toString: () => "CTEST" },
+        id: `${ledger}-0`,
+        type: "contract",
+        topic: [],
+        value: { toXDR: (_: string) => "" },
+      };
+    }
+
+    it("emits every event in the batch, even when the callback for one throws", async () => {
+      // Previously: one throwing callback aborted the whole for-loop,
+      // silently dropping every later event in the same batch — even
+      // though they had nothing to do with the failure, and lastLedger
+      // had already advanced past all of them before any callback ran,
+      // so they could never be redelivered on the next poll either.
+      const monitor = new ContractMonitor("testnet");
+      monitor.watch({ decode: false });
+      jest.spyOn(monitor.getServer(), "getEvents").mockResolvedValueOnce({
+        events: [fakeRawEvent(10), fakeRawEvent(11), fakeRawEvent(12)],
+        latestLedger: 12,
+      } as never);
+
+      const seen: number[] = [];
+      monitor.on("event", (event) => {
+        seen.push(event.ledger);
+        if (event.ledger === 11) {
+          throw new Error("boom from a buggy user callback");
+        }
+      });
+      const errors: Error[] = [];
+      monitor.on("error", (err) => errors.push(err));
+
+      await monitor.fetchAndEmitEvents();
+
+      expect(seen).toEqual([10, 11, 12]);
+      expect(errors).toHaveLength(1);
+      expect(errors[0].message).toContain("boom");
+    });
+  });
 });

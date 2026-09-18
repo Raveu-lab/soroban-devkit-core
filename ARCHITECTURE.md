@@ -197,6 +197,8 @@ stop()
 
 **Concurrency:** Single polling loop. The next poll only starts after the current one completes (via `.finally()`), preventing overlapping requests.
 
+**Per-event isolation:** `fetchAndEmitEvents()` wraps each event's build/decode/emit in its own try/catch. Without this, one throwing event callback would propagate out of the `for` loop and abort every later event in the same batch too — including ones unrelated to the failure — and since `lastLedger` is advanced before the loop runs (it reflects what the RPC reported, not local processing success), those dropped events could never be recovered by a later poll either. A per-event failure is now reported via the `error` callback instead, and processing continues with the next event.
+
 ---
 
 ### `bindings.ts` — `BindingGenerator`
