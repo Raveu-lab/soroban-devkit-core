@@ -82,6 +82,32 @@ describe("ArgEncoder", () => {
     expect(roundTrip(val)).toEqual({ a: 1, b: 2 });
   });
 
+  describe("invalid map keys", () => {
+    // encode() previously accepted any object key as a scvSymbol without
+    // validating it, unlike string *values* (which already go through
+    // SYMBOL_PATTERN via encodeString). The failure only surfaced much
+    // later, deep inside toXDR(), with an opaque error unrelated to the
+    // actual cause: "XDR Write Error: got 50 bytes, max allowed is 32" —
+    // no mention of which key, or that it's even about a map key.
+
+    it("throws a clear error for a key containing a space", () => {
+      expect(() => encoder.encode({ "has spaces": 1 })).toThrow(/"has spaces"/);
+    });
+
+    it("throws a clear error for a key longer than 32 characters", () => {
+      const longKey = "thisiswaytoolongtobeavalidsymbolgreaterthan32chars";
+      expect(() => encoder.encode({ [longKey]: 1 })).toThrow(new RegExp(longKey));
+    });
+
+    it("throws a clear error for an empty string key", () => {
+      expect(() => encoder.encode({ "": 1 })).toThrow(/key/i);
+    });
+
+    it("still accepts a valid Symbol key", () => {
+      expect(() => encoder.encode({ valid_key123: 1 })).not.toThrow();
+    });
+  });
+
   describe("unsigned integer hints ($u32/$u64/$u128)", () => {
     it("encodes { $u32: n } as scvU32, not the default signed i32", () => {
       const val = encoder.encode({ $u32: 42 });

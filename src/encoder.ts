@@ -131,13 +131,17 @@ export class ArgEncoder {
   }
 
   private encodeObject(value: Record<string, unknown>): xdr.ScVal {
-    const entries = Object.entries(value).map(
-      ([key, val]) =>
-        new xdr.ScMapEntry({
-          key: xdr.ScVal.scvSymbol(key),
-          val: this.encode(val),
-        })
-    );
+    const entries = Object.entries(value).map(([key, val]) => {
+      if (!SYMBOL_PATTERN.test(key)) {
+        throw new Error(
+          `ArgEncoder: map key "${key}" is not a valid Symbol — must be 1-32 characters from [A-Za-z0-9_]`
+        );
+      }
+      return new xdr.ScMapEntry({
+        key: xdr.ScVal.scvSymbol(key),
+        val: this.encode(val),
+      });
+    });
     return xdr.ScVal.scvMap(entries);
   }
 
