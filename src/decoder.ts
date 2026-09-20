@@ -90,6 +90,12 @@ export class EventDecoder {
       case xdr.ScValType.scvI64():
         return val.i64().toString();
 
+      case xdr.ScValType.scvTimepoint():
+        return val.timepoint().toString();
+
+      case xdr.ScValType.scvDuration():
+        return val.duration().toString();
+
       case xdr.ScValType.scvU128():
         return this.u128ToBigInt(val.u128()).toString();
 

@@ -161,6 +161,21 @@ describe("EventDecoder", () => {
       const result = decoder.decode(event);
       expect(result.decodedData).toBe("[decode error]");
     });
+
+    it("decodes a Timepoint as a string, matching how u64 is decoded", () => {
+      // Previously fell through to the default case as "[unsupported:
+      // scvTimepoint]" — BindingGenerator already maps a spec's Timepoint
+      // type to TS `string`, but nothing actually decoded a real one.
+      const xdrStr = xdr.ScVal.scvTimepoint(new xdr.TimePoint(1_700_000_000)).toXDR("base64");
+      const event = makeEvent([], xdrStr);
+      expect(decoder.decode(event).decodedData).toBe("1700000000");
+    });
+
+    it("decodes a Duration as a string, matching how u64 is decoded", () => {
+      const xdrStr = xdr.ScVal.scvDuration(new xdr.Duration(86_400)).toXDR("base64");
+      const event = makeEvent([], xdrStr);
+      expect(decoder.decode(event).decodedData).toBe("86400");
+    });
   });
 
   describe("decode", () => {
