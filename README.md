@@ -201,7 +201,7 @@ encoder.encodeArgs([{ $u128: "1000000000000000000000" }]); // scvU128
 
 | Network | RPC Endpoint |
 |---------|-------------|
-| `mainnet` | `https://mainnet.stellar.validationcloud.io/v1/soroban/rpc` |
+| `mainnet` | `https://mainnet.sorobanrpc.com` |
 | `testnet` | `https://soroban-testnet.stellar.org` |
 | `futurenet` | `https://rpc-futurenet.stellar.org` |
 | `local` | `http://localhost:8000/soroban/rpc` |

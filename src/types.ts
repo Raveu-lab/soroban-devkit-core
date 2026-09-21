@@ -24,7 +24,7 @@ export interface NetworkConfig {
 export const NETWORK_CONFIGS: Record<Network, NetworkConfig> = {
   mainnet: {
     network: "mainnet",
-    rpcUrl: "https://mainnet.stellar.validationcloud.io/v1/soroban/rpc",
+    rpcUrl: "https://mainnet.sorobanrpc.com",
     networkPassphrase: "Public Global Stellar Network ; September 2015",
   },
   testnet: {

@@ -1,3 +1,4 @@
+import { rpc } from "@stellar/stellar-sdk";
 import { NETWORK_CONFIGS, Network } from "../src/types";
 
 describe("NETWORK_CONFIGS", () => {
@@ -38,4 +39,17 @@ describe("NETWORK_CONFIGS", () => {
       expect(NETWORK_CONFIGS[net].network).toBe(net);
     }
   });
+
+  it("mainnet's default rpcUrl is actually reachable without an API key", async () => {
+    // The previous default (validationcloud.io's endpoint) returns
+    // {"error":"invalid api key"} for every request with no credentials
+    // configured — confirmed live. Unlike testnet/futurenet/local, mainnet
+    // was silently unusable out of the box despite being documented
+    // identically to the others in the README's Supported Networks table.
+    // Verified against the real endpoint here, not just a health-check
+    // assumption, matching this project's testnet integration tests.
+    const server = new rpc.Server(NETWORK_CONFIGS.mainnet.rpcUrl);
+    const health = await server.getHealth();
+    expect(health.status).toBe("healthy");
+  }, 15000);
 });
