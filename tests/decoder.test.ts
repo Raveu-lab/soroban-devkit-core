@@ -176,6 +176,58 @@ describe("EventDecoder", () => {
       const event = makeEvent([], xdrStr);
       expect(decoder.decode(event).decodedData).toBe("86400");
     });
+
+    // u128/i128 were previously only exercised indirectly, via encoder
+    // tests' round-trip through the decoder — nothing in this file tested
+    // the decoder's own u128ToBigInt/i128ToBigInt directly with a real
+    // fixture spanning both 64-bit halves.
+    it("decodes a scvU128 spanning both 64-bit halves", () => {
+      const parts = new xdr.UInt128Parts({ hi: new xdr.Uint64(1n), lo: new xdr.Uint64(2n) });
+      const xdrStr = xdr.ScVal.scvU128(parts).toXDR("base64");
+      const event = makeEvent([], xdrStr);
+      // 1 * 2^64 + 2
+      expect(decoder.decode(event).decodedData).toBe("18446744073709551618");
+    });
+
+    it("decodes a negative scvI128 spanning both 64-bit halves", () => {
+      const parts = new xdr.Int128Parts({ hi: new xdr.Int64(-1n), lo: new xdr.Uint64(0n) });
+      const xdrStr = xdr.ScVal.scvI128(parts).toXDR("base64");
+      const event = makeEvent([], xdrStr);
+      // hi=-1, lo=0 is the two's-complement representation of -2^64
+      expect(decoder.decode(event).decodedData).toBe("-18446744073709551616");
+    });
+
+    it("decodes a scvU256 spanning all four 64-bit segments", () => {
+      // Previously fell through as "[unsupported: scvU256]".
+      const parts = new xdr.UInt256Parts({
+        hiHi: new xdr.Uint64(1n),
+        hiLo: new xdr.Uint64(0n),
+        loHi: new xdr.Uint64(0n),
+        loLo: new xdr.Uint64(2n),
+      });
+      const xdrStr = xdr.ScVal.scvU256(parts).toXDR("base64");
+      const event = makeEvent([], xdrStr);
+      // 1 * 2^192 + 2
+      expect(decoder.decode(event).decodedData).toBe(
+        "6277101735386680763835789423207666416102355444464034512898"
+      );
+    });
+
+    it("decodes a negative scvI256 spanning all four 64-bit segments", () => {
+      // Previously fell through as "[unsupported: scvI256]".
+      const parts = new xdr.Int256Parts({
+        hiHi: new xdr.Int64(-1n),
+        hiLo: new xdr.Uint64(0n),
+        loHi: new xdr.Uint64(0n),
+        loLo: new xdr.Uint64(0n),
+      });
+      const xdrStr = xdr.ScVal.scvI256(parts).toXDR("base64");
+      const event = makeEvent([], xdrStr);
+      // hiHi=-1, rest=0 is the two's-complement representation of -2^192
+      expect(decoder.decode(event).decodedData).toBe(
+        "-6277101735386680763835789423207666416102355444464034512896"
+      );
+    });
   });
 
   describe("decode", () => {

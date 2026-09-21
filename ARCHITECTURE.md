@@ -116,6 +116,7 @@ decode(event)
 | `scvU64/I64` | `string`        |
 | `scvTimepoint/Duration` | `string` (unix seconds, same as u64) |
 | `scvU128/I128` | `string`      |
+| `scvU256/I256` | `string`      |
 | `scvAddress` | `string` (G.../C...) |
 | `scvSymbol`  | `string`        |
 | `scvString`  | `string`        |

@@ -102,6 +102,12 @@ export class EventDecoder {
       case xdr.ScValType.scvI128():
         return this.i128ToBigInt(val.i128()).toString();
 
+      case xdr.ScValType.scvU256():
+        return this.u256ToBigInt(val.u256()).toString();
+
+      case xdr.ScValType.scvI256():
+        return this.i256ToBigInt(val.i256()).toString();
+
       case xdr.ScValType.scvAddress():
         return Address.fromScAddress(val.address()).toString();
 
@@ -165,6 +171,36 @@ export class EventDecoder {
   private i128ToBigInt(parts: xdr.Int128Parts): bigint {
     return (
       BigInt(parts.hi().toString()) * BigInt("18446744073709551616") + BigInt(parts.lo().toString())
+    );
+  }
+
+  /**
+   * Convert a UInt256Parts XDR value into a BigInt. Four 64-bit segments
+   * (hiHi, hiLo, loHi, loLo), each multiplied by the matching power of
+   * 2^64 before summing — same approach as u128ToBigInt, extended to two
+   * more segments.
+   */
+  private u256ToBigInt(parts: xdr.UInt256Parts): bigint {
+    return (
+      BigInt(parts.hiHi().toString()) * 2n ** 192n +
+      BigInt(parts.hiLo().toString()) * 2n ** 128n +
+      BigInt(parts.loHi().toString()) * 2n ** 64n +
+      BigInt(parts.loLo().toString())
+    );
+  }
+
+  /**
+   * Convert an Int256Parts XDR value into a BigInt. Same shape as
+   * u256ToBigInt; hiHi is signed, the rest unsigned — same asymmetry as
+   * i128ToBigInt's signed hi, producing the correct two's-complement
+   * result across the full 256 bits.
+   */
+  private i256ToBigInt(parts: xdr.Int256Parts): bigint {
+    return (
+      BigInt(parts.hiHi().toString()) * 2n ** 192n +
+      BigInt(parts.hiLo().toString()) * 2n ** 128n +
+      BigInt(parts.loHi().toString()) * 2n ** 64n +
+      BigInt(parts.loLo().toString())
     );
   }
 }
