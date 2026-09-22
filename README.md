@@ -36,11 +36,16 @@ Developers coming from Ethereum have Hardhat, Foundry, and Ethers. They get simu
 
 ## Installation
 
+Not yet published to npm — `npm install @soroban-devkit/core` will 404 until it is. Until then, build it from source:
+
 ```bash
-npm install @soroban-devkit/core
+git clone https://github.com/Raveu-lab/soroban-devkit-core.git
+cd soroban-devkit-core
+npm install
+npm run build
 ```
 
-Requires Node.js >= 22.12.0 (required by `@stellar/stellar-sdk` 17.x).
+Requires Node.js >= 20.0.0 (matches `package.json`'s `engines` field and the real requirement of `@stellar/stellar-sdk` ^15.1.0, the version this project actually depends on).
 
 ---
 
