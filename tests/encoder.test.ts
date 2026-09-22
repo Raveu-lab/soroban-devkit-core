@@ -163,6 +163,35 @@ describe("ArgEncoder", () => {
       ).toThrow(/u128/);
     });
 
+    it("encodes { $u256: \"n\" } as scvU256 from a digit string", () => {
+      // u256::MAX = 2^256 - 1
+      const val = encoder.encode({
+        $u256: "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      });
+      expect(val.switch()).toBe(xdr.ScValType.scvU256());
+      expect(roundTrip(val)).toBe(
+        "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+      );
+    });
+
+    it("encodes { $u256: n } as scvU256 from a plain number", () => {
+      const val = encoder.encode({ $u256: 1_000_000 });
+      expect(val.switch()).toBe(xdr.ScValType.scvU256());
+      expect(roundTrip(val)).toBe("1000000");
+    });
+
+    it("rejects a negative $u256 value", () => {
+      expect(() => encoder.encode({ $u256: "-1" })).toThrow(/u256/);
+    });
+
+    it("rejects a $u256 value above u256::MAX", () => {
+      expect(() =>
+        encoder.encode({
+          $u256: "115792089237316195423570985008687907853269984665640564039457584007913129639936",
+        })
+      ).toThrow(/u256/);
+    });
+
     it("does not hijack an ordinary map whose only key happens to not match a hint", () => {
       const val = encoder.encode({ amount: 5 });
       expect(val.switch()).toBe(xdr.ScValType.scvMap());

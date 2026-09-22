@@ -178,7 +178,7 @@ If `pollingIntervalMs` is omitted, the interval isn't a fixed guess — each pol
 | `new BindingGenerator(options)` | Configure contract ID, output directory, network |
 | `generate()` | Fetch the contract spec and write TypeScript bindings to disk |
 
-Generated calls automatically use `ArgEncoder`'s `$u32`/`$u64`/`$u128` hints for arguments the contract spec declares as unsigned — you don't need to wrap them yourself the way you would calling `ArgEncoder` directly.
+Generated calls automatically use `ArgEncoder`'s `$u32`/`$u64`/`$u128`/`$u256` hints for arguments the contract spec declares as unsigned — you don't need to wrap them yourself the way you would calling `ArgEncoder` directly.
 
 ### `ArgEncoder`
 
@@ -187,12 +187,13 @@ Generated calls automatically use `ArgEncoder`'s `$u32`/`$u64`/`$u128` hints for
 | `encode(value)` | Encode a single plain value into an `xdr.ScVal`, inferring its type |
 | `encodeArgs(values)` | Encode an array of plain values, in order |
 
-Plain integers/digit strings always infer the signed variant (`scvI32`/`scvI128`) — there's no contract spec to tell `ArgEncoder` a parameter is actually `u32`/`u64`/`u128`, which is common for ids/counts/thresholds. Calling such a function fails with a cryptic host VM trap, not a clear error. Force the unsigned variant explicitly with a single-key hint object instead:
+Plain integers/digit strings always infer the signed variant (`scvI32`/`scvI128`) — there's no contract spec to tell `ArgEncoder` a parameter is actually `u32`/`u64`/`u128`/`u256`, which is common for ids/counts/thresholds. Calling such a function fails with a cryptic host VM trap, not a clear error. Force the unsigned variant explicitly with a single-key hint object instead:
 
 ```ts
 encoder.encodeArgs([{ $u32: 0 }]); // scvU32, not scvI32
 encoder.encodeArgs([{ $u64: "18446744073709551615" }]); // scvU64, digit string for values beyond safe-integer range
 encoder.encodeArgs([{ $u128: "1000000000000000000000" }]); // scvU128
+encoder.encodeArgs([{ $u256: "115792089237316195423570985008687907853269984665640564039457584007913129639935" }]); // scvU256
 ```
 
 ---

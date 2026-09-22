@@ -143,6 +143,16 @@ describe("BindingGenerator.buildBindings", () => {
       expect(content).toContain("this.encoder.encodeArgs([{ $u128: total }])");
     });
 
+    it("wraps a u256 arg in the $u256 hint", () => {
+      // Without this case, argExpression's switch fell through to `default`
+      // and passed the raw arg name through unwrapped — the same
+      // opaque-host-trap risk as the u32/u64/u128 cases above, just for
+      // U256-typed contract parameters instead.
+      const spec = func("f", [input("amount", xdr.ScSpecTypeDef.scSpecTypeU256())]);
+      const content = generator.buildBindings("CCNGT...", [spec]);
+      expect(content).toContain("this.encoder.encodeArgs([{ $u256: amount }])");
+    });
+
     it("does not wrap a signed i32/i64/i128 arg — ArgEncoder's default already matches", () => {
       const spec = func("f", [
         input("a", xdr.ScSpecTypeDef.scSpecTypeI32()),

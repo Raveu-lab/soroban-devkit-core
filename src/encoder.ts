@@ -5,7 +5,8 @@ const INTEGER_STRING_PATTERN = /^-?\d+$/;
 const UINT64_MASK = (1n << 64n) - 1n;
 const UINT64_MAX = UINT64_MASK;
 const UINT128_MAX = (1n << 128n) - 1n;
-const UNSIGNED_HINT_PATTERN = /^\$(u32|u64|u128)$/;
+const UINT256_MAX = (1n << 256n) - 1n;
+const UNSIGNED_HINT_PATTERN = /^\$(u32|u64|u128|u256)$/;
 
 /**
  * ArgEncoder
@@ -26,17 +27,19 @@ const UNSIGNED_HINT_PATTERN = /^\$(u32|u64|u128)$/;
  * - { $u32: n }   -> scvU32 (single-key escape hatch — see below)
  * - { $u64: n }   -> scvU64
  * - { $u128: n }  -> scvU128
+ * - { $u256: n }  -> scvU256
  * - plain object  -> scvMap (keys encoded as scvSymbol, values recursively)
  *
  * Plain numbers and digit strings always infer the *signed* variant
  * (i32/i128) — there's no contract spec here to say a parameter is actually
  * unsigned, which is common for ids/counts/thresholds. A function call with
  * a mismatched sign fails with an opaque host VM trap, not a clear encoding
- * error. `{ $u32: n }`/`{ $u64: n }`/`{ $u128: n }` — a single-key object
- * whose key matches exactly, `n` a number or digit string — is a JSON-safe
- * escape hatch to force the unsigned variant explicitly. Collision with a
- * genuine scvMap argument is possible in principle but not realistic in
- * practice (no real contract struct field is named "$u32").
+ * error. `{ $u32: n }`/`{ $u64: n }`/`{ $u128: n }`/`{ $u256: n }` — a
+ * single-key object whose key matches exactly, `n` a number or digit
+ * string — is a JSON-safe escape hatch to force the unsigned variant
+ * explicitly. Collision with a genuine scvMap argument is possible in
+ * principle but not realistic in practice (no real contract struct field is
+ * named "$u32").
  *
  * @example
  * ```ts
@@ -159,7 +162,7 @@ export class ArgEncoder {
     if (!match) return null;
 
     const raw = value[keys[0]];
-    const kind = match[1] as "u32" | "u64" | "u128";
+    const kind = match[1] as "u32" | "u64" | "u128" | "u256";
     switch (kind) {
       case "u32":
         return this.encodeU32(raw);
@@ -167,6 +170,8 @@ export class ArgEncoder {
         return this.encodeU64(raw);
       case "u128":
         return this.encodeU128(raw);
+      case "u256":
+        return this.encodeU256(raw);
     }
   }
 
@@ -210,6 +215,25 @@ export class ArgEncoder {
     const lo = value & UINT64_MASK;
     return xdr.ScVal.scvU128(
       new xdr.UInt128Parts({ hi: new xdr.Uint64(hi), lo: new xdr.Uint64(lo) })
+    );
+  }
+
+  private encodeU256(raw: unknown): xdr.ScVal {
+    const value = this.toBigIntHint(raw, "u256");
+    if (value < 0n || value > UINT256_MAX) {
+      throw new Error(`ArgEncoder: $u256 value ${value} is outside the u256 range`);
+    }
+    const hiHi = value >> 192n;
+    const hiLo = (value >> 128n) & UINT64_MASK;
+    const loHi = (value >> 64n) & UINT64_MASK;
+    const loLo = value & UINT64_MASK;
+    return xdr.ScVal.scvU256(
+      new xdr.UInt256Parts({
+        hiHi: new xdr.Uint64(hiHi),
+        hiLo: new xdr.Uint64(hiLo),
+        loHi: new xdr.Uint64(loHi),
+        loLo: new xdr.Uint64(loLo),
+      })
     );
   }
 

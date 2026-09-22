@@ -138,7 +138,7 @@ ${methods ? "\n" + methods + "\n" : ""}}
    * for a real u32 parameter and get rejected with an opaque host trap
    * (confirmed against a live deployed contract). The on-chain spec tells
    * us the true type here, so wrap unsigned args in ArgEncoder's $u32/$u64/
-   * $u128 hint instead of passing the raw name through.
+   * $u128/$u256 hint instead of passing the raw name through.
    */
   private argExpression(argName: string, type: xdr.ScSpecTypeDef): string {
     switch (type.switch()) {
@@ -148,6 +148,8 @@ ${methods ? "\n" + methods + "\n" : ""}}
         return `{ $u64: ${argName} }`;
       case xdr.ScSpecType.scSpecTypeU128():
         return `{ $u128: ${argName} }`;
+      case xdr.ScSpecType.scSpecTypeU256():
+        return `{ $u256: ${argName} }`;
       default:
         return argName;
     }
