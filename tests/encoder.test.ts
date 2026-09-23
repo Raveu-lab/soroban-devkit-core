@@ -60,6 +60,31 @@ describe("ArgEncoder", () => {
     expect(roundTrip(val)).toBe(big);
   });
 
+  it("round-trips a digit string at exactly i128::MAX", () => {
+    const max = "170141183460469231731687303715884105727";
+    expect(roundTrip(encoder.encode(max))).toBe(max);
+  });
+
+  it("round-trips a digit string at exactly i128::MIN", () => {
+    const min = "-170141183460469231731687303715884105728";
+    expect(roundTrip(encoder.encode(min))).toBe(min);
+  });
+
+  it("throws a clear ArgEncoder error for a digit string above i128::MAX, not a raw XDR RangeError", () => {
+    // Previously this fell straight through to bigIntToInt128Parts, which
+    // let the underlying js-xdr library throw an opaque
+    // "bigint value ... for i64 out of range [...]" RangeError instead of
+    // a clear, branded error consistent with every other range check in
+    // this file ($u32/$u64/$u128/$u256).
+    const overMax = "170141183460469231731687303715884105728";
+    expect(() => encoder.encode(overMax)).toThrow(/i128/);
+  });
+
+  it("throws a clear ArgEncoder error for a digit string below i128::MIN", () => {
+    const underMin = "-170141183460469231731687303715884105729";
+    expect(() => encoder.encode(underMin)).toThrow(/i128/);
+  });
+
   it("encodes a short alphanumeric string as a Symbol", () => {
     const val = encoder.encode("transfer");
     expect(val.switch()).toBe(xdr.ScValType.scvSymbol());

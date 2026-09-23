@@ -6,6 +6,8 @@ const UINT64_MASK = (1n << 64n) - 1n;
 const UINT64_MAX = UINT64_MASK;
 const UINT128_MAX = (1n << 128n) - 1n;
 const UINT256_MAX = (1n << 256n) - 1n;
+const INT128_MAX = (1n << 127n) - 1n;
+const INT128_MIN = -(1n << 127n);
 const UNSIGNED_HINT_PATTERN = /^\$(u32|u64|u128|u256)$/;
 
 /**
@@ -112,7 +114,14 @@ export class ArgEncoder {
     }
 
     if (INTEGER_STRING_PATTERN.test(value)) {
-      return xdr.ScVal.scvI128(this.bigIntToInt128Parts(BigInt(value)));
+      const parsed = BigInt(value);
+      if (parsed < INT128_MIN || parsed > INT128_MAX) {
+        throw new Error(
+          `ArgEncoder: ${value} is outside the i128 range [${INT128_MIN}, ${INT128_MAX}] — ` +
+            `pass a smaller value, or use the { $u128: n } / { $u256: n } hint if it's meant to be unsigned`
+        );
+      }
+      return xdr.ScVal.scvI128(this.bigIntToInt128Parts(parsed));
     }
 
     if (SYMBOL_PATTERN.test(value)) {
