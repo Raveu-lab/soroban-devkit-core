@@ -141,13 +141,26 @@ export class EventDecoder {
 
   /**
    * Decode an scvMap into a plain JavaScript object.
+   *
+   * Object keys must be strings, so every decoded key gets stringified —
+   * for an ordinary primitive key (Symbol/String/Address/number/bigint
+   * string/bool/null) that's a plain String() coercion, giving clean keys
+   * like "amount". A non-primitive key (the decoded value of an scvVec or
+   * nested scvMap key) is JSON.stringify'd instead: bare String() collapses
+   * distinct structures to the same text (e.g. both [1, 2] and ["1,2"]
+   * stringify to "1,2"), silently dropping one of the two entries with no
+   * error. JSON.stringify preserves the structural difference instead.
    */
   private decodeMap(val: xdr.ScVal): Record<string, unknown> {
     const map = val.map();
     const result: Record<string, unknown> = {};
     if (map) {
       for (const entry of map) {
-        const key = String(this.scValToJs(entry.key()));
+        const decodedKey = this.scValToJs(entry.key());
+        const key =
+          typeof decodedKey === "object" && decodedKey !== null
+            ? JSON.stringify(decodedKey)
+            : String(decodedKey);
         result[key] = this.scValToJs(entry.val());
       }
     }

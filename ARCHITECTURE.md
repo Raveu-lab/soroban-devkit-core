@@ -124,6 +124,8 @@ decode(event)
 | `scvVec`     | `unknown[]`     |
 | `scvMap`     | `Record<string, unknown>` |
 
+**Map key stringification:** object keys must be strings, so every decoded map key is stringified. A primitive key (Symbol/String/Address/number/bigint string/bool/null) uses plain `String()` coercion, giving clean keys like `"amount"`. A non-primitive key (a decoded `scvVec`/`scvMap` used as a map key) uses `JSON.stringify` instead — bare `String()` collapsed distinct structures to the same text (e.g. both `[1, 2]` and `["1,2"]` stringify to `"1,2"`), silently dropping one of the two entries with no error or warning. Confirmed live with exactly that fixture before fixing it.
+
 **State:** Stateless. Safe to use as a singleton.
 
 ---

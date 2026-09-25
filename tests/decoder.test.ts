@@ -144,6 +144,36 @@ describe("EventDecoder", () => {
       expect(decoder.decode(event).decodedData).toEqual({ amount: 1000, fee: 10 });
     });
 
+    it("does not collide two distinct non-primitive map keys into the same string key", () => {
+      // Confirmed live: a Vec key [1, 2] and a Vec key ["1,2"] both
+      // stringify to the identical JS object key "1,2" via bare String()
+      // coercion, so the second entry silently overwrote the first and one
+      // of the two distinct map entries was lost entirely — no error, no
+      // warning, just a map with fewer entries than the contract emitted.
+      const key1 = xdr.ScVal.scvVec([xdr.ScVal.scvU32(1), xdr.ScVal.scvU32(2)]);
+      const key2 = xdr.ScVal.scvVec([xdr.ScVal.scvString(Buffer.from("1,2"))]);
+      const map = xdr.ScVal.scvMap([
+        new xdr.ScMapEntry({ key: key1, val: xdr.ScVal.scvU32(100) }),
+        new xdr.ScMapEntry({ key: key2, val: xdr.ScVal.scvU32(200) }),
+      ]);
+      const event = makeEvent([], map.toXDR("base64"));
+      const decoded = decoder.decode(event).decodedData as Record<string, unknown>;
+      expect(Object.keys(decoded)).toHaveLength(2);
+      expect(Object.values(decoded).sort()).toEqual([100, 200]);
+    });
+
+    it("still uses plain, unquoted string keys for ordinary Symbol/string map keys", () => {
+      // The fix for non-primitive keys above must not change the common
+      // case — a real contract's Map<Symbol, T> should still decode with
+      // clean keys like "amount", not '"amount"'.
+      const event = makeEvent(
+        [],
+        makeMapXdr([["amount", xdr.ScVal.scvU32(1000)]])
+      );
+      const decoded = decoder.decode(event).decodedData as Record<string, unknown>;
+      expect(Object.keys(decoded)).toEqual(["amount"]);
+    });
+
     it("decodes an account address (G...) to its strkey string", () => {
       const address = "GACP4WS6CA6GPH7NWEPY6AKRTNQSRAL7KB2SDYEKNN7YMMCYGKKI2HE4";
       const event = makeEvent([], makeAddressXdr(address));
