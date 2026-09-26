@@ -222,6 +222,65 @@ describe("ContractSimulator — additional edge cases", () => {
     });
   });
 
+  describe("normalizeRestoreResponse", () => {
+    // A "needs restoration" simulation previously became a dead-end error
+    // string with no way to act on it — the actual restorePreamble
+    // (minResourceFee + transactionData for a RestoreFootprintOp) was
+    // silently discarded, even though the RPC response carries exactly
+    // what's needed to build the restore operation. Forced callers to drop
+    // down to the raw Stellar SDK themselves, defeating this library's
+    // whole "no code required" purpose.
+    function makeRestoreResponse() {
+      return {
+        id: "1",
+        latestLedger: 100,
+        events: [],
+        _parsed: true,
+        transactionData: new SorobanDataBuilder().setResources(1000, 200, 300),
+        minResourceFee: "999999",
+        result: { auth: [], retval: xdr.ScVal.scvVoid() },
+        restorePreamble: {
+          minResourceFee: "555555",
+          transactionData: new SorobanDataBuilder(),
+        },
+      } as unknown as import("@stellar/stellar-sdk").rpc.Api.SimulateTransactionRestoreResponse;
+    }
+
+    it("marks the result as unsuccessful", () => {
+      const sim = new ContractSimulator("testnet");
+      expect(sim.normalizeRestoreResponse(makeRestoreResponse()).success).toBe(false);
+    });
+
+    it("sets needsRestore to true, so callers can distinguish this from an ordinary failure", () => {
+      const sim = new ContractSimulator("testnet");
+      expect(sim.normalizeRestoreResponse(makeRestoreResponse()).needsRestore).toBe(true);
+    });
+
+    it("surfaces restorePreamble.minResourceFee as restoreFee, instead of discarding it", () => {
+      const sim = new ContractSimulator("testnet");
+      expect(sim.normalizeRestoreResponse(makeRestoreResponse()).restoreFee).toBe("555555");
+    });
+
+    it("keeps the raw response available via rawResult, so an advanced caller can still reach restorePreamble.transactionData to build the restore operation themselves", () => {
+      const sim = new ContractSimulator("testnet");
+      const response = makeRestoreResponse();
+      const result = sim.normalizeRestoreResponse(response);
+      expect(result.rawResult).toBe(response);
+    });
+
+    it("includes a clear, actionable error message", () => {
+      const sim = new ContractSimulator("testnet");
+      expect(sim.normalizeRestoreResponse(makeRestoreResponse()).error).toMatch(/restor/i);
+    });
+
+    it("an ordinary failed simulation (normalizeSimulationError) leaves needsRestore undefined", () => {
+      // Sanity check that the new field doesn't leak into the unrelated
+      // failure path and get treated as "restorable" by mistake.
+      const sim = new ContractSimulator("testnet");
+      expect(sim.normalizeSimulationError("insufficient funds").needsRestore).toBeUndefined();
+    });
+  });
+
   describe("simulateSequence", () => {
     function makeResult(success: boolean, error?: string): SimulationResult {
       return {

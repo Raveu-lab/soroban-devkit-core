@@ -157,6 +157,18 @@ const args = encoder.encodeArgs(["GABC...", "1000000", true]);
 | `simulate(contractId, method, args, caller)` | Simulate a contract call and return a `SimulationResult` — on success, `returnValue` holds the invocation's decoded return value (same type mapping as `EventDecoder`), not just cost/footprint |
 | `simulateSequence(calls, options?)` | Simulate several independent calls in order; stops at the first failure unless `{ stopOnFailure: false }` |
 
+If a call would only succeed after archived contract data is restored, `success` is `false` but `needsRestore` is `true` and `restoreFee` holds the stroops fee for the required `RestoreFootprintOp` — distinguishing this from an ordinary failure with no recovery path:
+
+```ts
+const result = await sim.simulate(contractId, "get_price", args, caller);
+if (result.needsRestore) {
+  console.log(`Restore needed, fee: ${result.restoreFee} stroops`);
+  // rawResult.restorePreamble.transactionData has what you need to build
+  // and submit the RestoreFootprintOp yourself — this library simulates,
+  // it doesn't submit transactions.
+}
+```
+
 ### `EventDecoder`
 
 | Method | Description |

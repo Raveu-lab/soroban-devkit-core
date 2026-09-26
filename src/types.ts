@@ -86,6 +86,20 @@ export interface SimulationResult {
   };
   /** Error message when success is false */
   error?: string;
+  /**
+   * True when the simulation determined the call would succeed if archived
+   * contract data is restored first — distinguishes this from an ordinary
+   * failure, which has no such recovery path.
+   */
+  needsRestore?: boolean;
+  /**
+   * The minResourceFee (stroops) required for the RestoreFootprintOp that
+   * would fix this, when `needsRestore` is true. The transaction data
+   * needed to actually build that operation is on `rawResult` (as
+   * `restorePreamble.transactionData`) — submitting it is outside this
+   * library's simulate-only scope.
+   */
+  restoreFee?: string;
   /** Raw RPC response for advanced use cases */
   rawResult?: unknown;
 }

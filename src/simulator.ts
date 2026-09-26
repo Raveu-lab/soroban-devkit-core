@@ -137,6 +137,31 @@ export class ContractSimulator {
   }
 
   /**
+   * Normalize a restore-required simulation response. Public so it can be
+   * tested in isolation without a network call.
+   *
+   * The call still counts as unsuccessful (`success: false`) — it didn't
+   * actually run — but `needsRestore`/`restoreFee` distinguish this from
+   * an ordinary failure with no recovery path, and `rawResult` keeps
+   * `restorePreamble.transactionData` reachable for a caller who wants to
+   * build and submit the RestoreFootprintOp themselves (out of scope for
+   * this simulate-only library).
+   */
+  normalizeRestoreResponse(
+    response: rpc.Api.SimulateTransactionRestoreResponse
+  ): SimulationResult {
+    return {
+      success: false,
+      error: "Contract data needs restoration before this call can succeed.",
+      needsRestore: true,
+      restoreFee: response.restorePreamble.minResourceFee,
+      footprint: { diskReadBytes: 0, writeBytes: 0, instructions: 0 },
+      cost: { minResourceFee: "0" },
+      rawResult: response,
+    };
+  }
+
+  /**
    * Fetch the current sequence number for a Stellar account.
    */
   private async fetchSequenceNumber(publicKey: string): Promise<string> {
@@ -155,9 +180,7 @@ export class ContractSimulator {
     }
 
     if (rpc.Api.isSimulationRestore(response)) {
-      return this.normalizeSimulationError(
-        "Contract data needs restoration before this call can succeed."
-      );
+      return this.normalizeRestoreResponse(response);
     }
 
     return this.normalizeSuccessResponse(
