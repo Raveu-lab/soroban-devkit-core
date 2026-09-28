@@ -205,6 +205,8 @@ stop()
 
 **Concurrency:** Single polling loop. The next poll only starts after the current one completes (via `.finally()`), preventing overlapping requests.
 
+**Cursor advances on empty polls:** `lastLedger` used to move only when events arrived. On a quiet contract the cursor never moved, so once the RPC's event-retention window rolled past it, every later poll failed with an out-of-range `startLedger` error — forever, with no recovery short of restarting the monitor. An empty response now advances the cursor to the RPC's reported `latestLedger` (never backwards). Nothing is skipped: everything up to `latestLedger` was already searched.
+
 **Per-event isolation:** `fetchAndEmitEvents()` wraps each event's build/decode/emit in its own try/catch. Without this, one throwing event callback would propagate out of the `for` loop and abort every later event in the same batch too — including ones unrelated to the failure — and since `lastLedger` is advanced before the loop runs (it reflects what the RPC reported, not local processing success), those dropped events could never be recovered by a later poll either. A per-event failure is now reported via the `error` callback instead, and processing continues with the next event.
 
 ---

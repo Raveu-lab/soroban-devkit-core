@@ -375,5 +375,41 @@ describe("ContractMonitor — additional edge cases", () => {
       expect(errors).toHaveLength(1);
       expect(errors[0].message).toContain("boom");
     });
+
+    it("advances the cursor to latestLedger when a poll returns no events, instead of staying pinned to a stale startLedger", async () => {
+      // lastLedger only advanced when events arrived. On a quiet contract
+      // the start ledger never moved, so once the RPC's event retention
+      // window rolled past it, every later poll would fail with an
+      // out-of-range startLedger error, forever, with no way to recover
+      // short of restarting the monitor.
+      const monitor = new ContractMonitor("testnet");
+      monitor.watch({ decode: false });
+      const getEvents = jest
+        .spyOn(monitor.getServer(), "getEvents")
+        .mockResolvedValueOnce({ events: [], latestLedger: 5000 } as never)
+        .mockResolvedValueOnce({ events: [], latestLedger: 5010 } as never);
+
+      await monitor.fetchAndEmitEvents();
+      await monitor.fetchAndEmitEvents();
+
+      const secondCallArgs = getEvents.mock.calls[1][0] as { startLedger: number };
+      expect(secondCallArgs.startLedger).toBe(5001);
+    });
+
+    it("never moves the cursor backwards if latestLedger is behind it", async () => {
+      const monitor = new ContractMonitor("testnet");
+      monitor.watch({ decode: false });
+      const getEvents = jest
+        .spyOn(monitor.getServer(), "getEvents")
+        .mockResolvedValueOnce({ events: [fakeRawEvent(9000)], latestLedger: 9000 } as never)
+        .mockResolvedValueOnce({ events: [], latestLedger: 8000 } as never)
+        .mockResolvedValueOnce({ events: [], latestLedger: 9500 } as never);
+
+      await monitor.fetchAndEmitEvents();
+      await monitor.fetchAndEmitEvents();
+      await monitor.fetchAndEmitEvents();
+
+      expect((getEvents.mock.calls[2][0] as { startLedger: number }).startLedger).toBe(9001);
+    });
   });
 });

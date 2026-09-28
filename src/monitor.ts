@@ -238,6 +238,15 @@ export class ContractMonitor {
       filters,
     });
 
+    // With no events, still move the cursor to the RPC's latestLedger: the
+    // RPC only retains a limited window of ledgers, so a cursor pinned to
+    // an old ledger on a quiet contract eventually falls out of range and
+    // every later poll fails. Everything up to latestLedger has been
+    // searched, so nothing is skipped by advancing.
+    if (response.events.length === 0 && typeof response.latestLedger === "number") {
+      this.lastLedger = Math.max(this.lastLedger, response.latestLedger);
+    }
+
     if (response.events.length > 0) {
       this.lastLedger = Math.max(...response.events.map((e) => e.ledger));
       for (const raw of response.events) {
