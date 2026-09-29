@@ -195,6 +195,11 @@ describe("BindingGenerator.buildBindings", () => {
       [xdr.ScSpecTypeDef.scSpecTypeU128(), "string"],
       [xdr.ScSpecTypeDef.scSpecTypeI128(), "string"],
       [xdr.ScSpecTypeDef.scSpecTypeAddress(), "string"],
+      // Previously fell through to the default case as the literal
+      // TypeScript type "unknown" — a real, decodable M... address type
+      // (confirmed live via Address.fromString) had no case here, unlike
+      // every other address-like type.
+      [xdr.ScSpecTypeDef.scSpecTypeMuxedAddress(), "string"],
       [xdr.ScSpecTypeDef.scSpecTypeSymbol(), "string"],
       [xdr.ScSpecTypeDef.scSpecTypeString(), "string"],
       [xdr.ScSpecTypeDef.scSpecTypeBytes(), "string"],

@@ -43,6 +43,19 @@ describe("ArgEncoder", () => {
     expect(roundTrip(val)).toBe(address);
   });
 
+  it("encodes an M... string as a muxed Address, not scvString", () => {
+    // tryEncodeAddress only recognized 56-char G.../C... strings — a 69-char
+    // M... muxed address (real, decodable via Address.fromString, confirmed
+    // live) fell through to scvString instead of scvAddress: the wrong XDR
+    // type, which fails at the contract boundary with an opaque mismatch
+    // error rather than a clear encoding one.
+    const muxed =
+      "MA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVAAAAAAAAAAAAAJLK";
+    const val = encoder.encode(muxed);
+    expect(val.switch()).toBe(xdr.ScValType.scvAddress());
+    expect(roundTrip(val)).toBe(muxed);
+  });
+
   it("encodes a numeric string as i128", () => {
     const val = encoder.encode("1000000");
     expect(val.switch()).toBe(xdr.ScValType.scvI128());

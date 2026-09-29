@@ -16,7 +16,7 @@ import { BindingGeneratorOptions, NETWORK_CONFIGS } from "./types";
  * resolved to real TS shapes without also generating their definitions,
  * which is out of scope here): Bool -> boolean; U32/I32 -> number;
  * U64/I64/U128/I128/U256/I256/Timepoint/Duration -> string; Address/
- * Symbol/String/Bytes/BytesN -> string; Vec<T> -> T[]; Option<T> ->
+ * MuxedAddress/Symbol/String/Bytes/BytesN -> string; Vec<T> -> T[]; Option<T> ->
  * T | undefined; Map<K,V> -> Record<string, V>; Tuple -> a TS tuple;
  * Result<T,_> -> T; Udt -> any (its name is kept in a comment).
  *
@@ -185,6 +185,7 @@ ${methods ? "\n" + methods + "\n" : ""}}
         return "string";
 
       case xdr.ScSpecType.scSpecTypeAddress():
+      case xdr.ScSpecType.scSpecTypeMuxedAddress():
       case xdr.ScSpecType.scSpecTypeSymbol():
       case xdr.ScSpecType.scSpecTypeString():
       case xdr.ScSpecType.scSpecTypeBytes():

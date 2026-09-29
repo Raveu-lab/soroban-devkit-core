@@ -119,7 +119,7 @@ decode(event)
 | `scvTimepoint/Duration` | `string` (unix seconds, same as u64) |
 | `scvU128/I128` | `string`      |
 | `scvU256/I256` | `string`      |
-| `scvAddress` | `string` (G.../C...) |
+| `scvAddress` | `string` (G.../C.../M...) |
 | `scvSymbol`  | `string`        |
 | `scvString`  | `string`        |
 | `scvBytes`   | `string` (hex)  |
@@ -151,7 +151,7 @@ encode(value)
 | `boolean` | `scvBool` |
 | `null` | `scvVoid` |
 | safe i32 integer | `scvI32` |
-| `G...`/`C...` string | `scvAddress` |
+| `G...`/`C...`/`M...` string | `scvAddress` (M... is a muxed account — `tryEncodeAddress` previously only recognized 56-char G.../C... strings, so a 69-char M... address silently fell through to `scvString` instead) |
 | digit string (e.g. `"1000000"`) | `scvI128` |
 | short `[A-Za-z0-9_]` string | `scvSymbol` |
 | other string | `scvString` |
@@ -227,6 +227,8 @@ generate()
   │    └─ scSpecTypeToTs(type)       → maps each ScSpecTypeDef to a TS type
   └─ write .ts file to outputDir
 ```
+
+`scSpecTypeToTs` previously had no case for `scSpecTypeMuxedAddress` (a real, decodable M... address type) — it fell through to the literal TypeScript type `unknown`, inconsistent with `scSpecTypeAddress` and every other address-like type, which map to `string`. Now mapped the same as `Address`.
 
 `network` accepts a custom `NetworkConfig` (not just a `Network` name), for a custom RPC endpoint — like `ContractSimulator`/`ContractMonitor`. Auth headers are the one exception: `Client.from()`'s `ClientOptions` has no headers field, so `NetworkConfig.headers` is silently not used here (it is respected by `ContractSimulator` and `ContractMonitor`).
 

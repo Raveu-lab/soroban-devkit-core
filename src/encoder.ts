@@ -21,7 +21,7 @@ const UNSIGNED_HINT_PATTERN = /^\$(u32|u64|u128|u256)$/;
  * - boolean       -> scvBool
  * - null          -> scvVoid
  * - safe i32 int  -> scvI32
- * - G.../C... str -> scvAddress
+ * - G.../C.../M... str -> scvAddress
  * - digit string  -> scvI128
  * - short [A-Za-z0-9_] string -> scvSymbol
  * - other string  -> scvString
@@ -132,7 +132,9 @@ export class ArgEncoder {
   }
 
   private tryEncodeAddress(value: string): xdr.ScVal | null {
-    if (value.length !== 56 || (value[0] !== "G" && value[0] !== "C")) {
+    const isAccountOrContract = value.length === 56 && (value[0] === "G" || value[0] === "C");
+    const isMuxedAccount = value.length === 69 && value[0] === "M";
+    if (!isAccountOrContract && !isMuxedAccount) {
       return null;
     }
     try {
