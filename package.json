@@ -29,7 +29,8 @@
   "files": [
     "dist",
     "README.md",
-    "ARCHITECTURE.md"
+    "ARCHITECTURE.md",
+    "CHANGELOG.md"
   ],
   "engines": {
     "node": ">=20.0.0"

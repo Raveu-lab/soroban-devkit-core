@@ -279,6 +279,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, coding standards,
 - [ ] Typed struct/union/enum bindings for `BindingGenerator` (currently maps to `any` — needs generating the UDT definitions themselves)
 - [ ] Transaction replay from historical ledger
 
+See [CHANGELOG.md](CHANGELOG.md) for what's actually shipped so far.
+
 ---
 
 ## License
