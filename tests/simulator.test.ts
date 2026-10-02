@@ -95,6 +95,25 @@ describe("ContractSimulator", () => {
       expect(result.success).toBe(false);
       expect(result.error).toBeDefined();
     }, 15000);
+
+    it("gives a clear error for a muxed (M...) caller, not the raw strkey decode failure", async () => {
+      // ArgEncoder now encodes M... addresses correctly as contract call
+      // *arguments*, which makes it a natural thing for a user to also try
+      // as --caller. Confirmed live: fetchSequenceNumber's getAccount()
+      // call rejects an M-address with "invalid version byte. expected 48,
+      // got 96" — a raw strkey-decoding detail that gives no indication
+      // what's wrong or what to do about it.
+      const sim = new ContractSimulator("testnet");
+      const muxed = "MA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVAAAAAAAAAAAAAJLK";
+      const result = await sim.simulate(
+        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+        "ping",
+        [],
+        muxed
+      );
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/muxed/i);
+    }, 15000);
   });
 });
 

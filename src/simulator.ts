@@ -165,6 +165,11 @@ export class ContractSimulator {
    * Fetch the current sequence number for a Stellar account.
    */
   private async fetchSequenceNumber(publicKey: string): Promise<string> {
+    if (publicKey.length === 69 && publicKey[0] === "M") {
+      throw new Error(
+        "ContractSimulator: a muxed (M...) address can't be used as the transaction source account — pass the underlying G... account as the caller instead."
+      );
+    }
     const account = await this.server.getAccount(publicKey);
     return account.sequenceNumber();
   }
