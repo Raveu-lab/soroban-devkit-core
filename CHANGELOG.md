@@ -39,6 +39,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `EventDecoder.decodeMap()` stringified non-primitive map keys (a decoded `Vec`/`Map` used as a key) with bare `String()`, silently colliding distinct keys that happened to stringify the same way and dropping one of the two entries.
 - `ContractMonitor`'s cursor only advanced when a poll returned events — on a quiet contract it stayed pinned to an old ledger until the RPC's retention window rolled past it, after which every later poll failed, permanently.
 - `ArgEncoder`/`BindingGenerator` didn't recognize `M...` muxed addresses — they silently fell through to `scvString`/the literal TypeScript type `unknown` instead of `scvAddress`/`string`.
+- `ContractSimulator` let a muxed (`M...`) `caller` reach `server.getAccount()` directly, which rejected it with a raw strkey-decoding error (`invalid version byte. expected 48, got 96`) instead of a clear message explaining a muxed address can't be a transaction source account.
 
 ### Changed
 
