@@ -192,6 +192,44 @@ describe("EventDecoder", () => {
       expect(result.decodedData).toBe("[decode error]");
     });
 
+    it("decodes a contract error as 'Error(Contract, #N)', matching the Stellar CLI's own format", () => {
+      // Previously fell through to the default case as "[unsupported:
+      // scvError]" — a real gap: scvError genuinely appears in diagnostic
+      // event data from real failed invocations (confirmed live against
+      // testnet), not just a theoretical type nobody emits.
+      const xdrStr = xdr.ScVal.scvError(xdr.ScError.sceContract(6)).toXDR("base64");
+      const event = makeEvent([], xdrStr);
+      expect(decoder.decode(event).decodedData).toBe("Error(Contract, #6)");
+    });
+
+    it("decodes a host error as 'Error(Type, Code)', matching the Stellar CLI's own format", () => {
+      const xdrStr = xdr.ScVal
+        .scvError(xdr.ScError.sceWasmVm(xdr.ScErrorCode.scecMissingValue()))
+        .toXDR("base64");
+      const event = makeEvent([], xdrStr);
+      expect(decoder.decode(event).decodedData).toBe("Error(WasmVm, MissingValue)");
+    });
+
+    it("decodes every ScError host-error variant without throwing", () => {
+      const variants: Array<[string, xdr.ScError]> = [
+        ["sceContext", xdr.ScError.sceContext(xdr.ScErrorCode.scecInvalidAction())],
+        ["sceStorage", xdr.ScError.sceStorage(xdr.ScErrorCode.scecMissingValue())],
+        ["sceObject", xdr.ScError.sceObject(xdr.ScErrorCode.scecUnexpectedType())],
+        ["sceCrypto", xdr.ScError.sceCrypto(xdr.ScErrorCode.scecInvalidInput())],
+        ["sceEvents", xdr.ScError.sceEvents(xdr.ScErrorCode.scecExceededLimit())],
+        ["sceBudget", xdr.ScError.sceBudget(xdr.ScErrorCode.scecExceededLimit())],
+        ["sceValue", xdr.ScError.sceValue(xdr.ScErrorCode.scecUnexpectedSize())],
+        ["sceAuth", xdr.ScError.sceAuth(xdr.ScErrorCode.scecInvalidAction())],
+      ];
+      for (const [, scError] of variants) {
+        const xdrStr = xdr.ScVal.scvError(scError).toXDR("base64");
+        const event = makeEvent([], xdrStr);
+        const result = decoder.decode(event).decodedData;
+        expect(typeof result).toBe("string");
+        expect(result).not.toContain("unsupported");
+      }
+    });
+
     it("decodes a Timepoint as a string, matching how u64 is decoded", () => {
       // Previously fell through to the default case as "[unsupported:
       // scvTimepoint]" — BindingGenerator already maps a spec's Timepoint

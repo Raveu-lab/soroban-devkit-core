@@ -127,6 +127,9 @@ decode(event)
 | `scvBytes`   | `string` (hex)  |
 | `scvVec`     | `unknown[]`     |
 | `scvMap`     | `Record<string, unknown>` |
+| `scvError`   | `string` (`"Error(Contract, #N)"` or `"Error(Type, Code)"` — the exact format the Stellar CLI itself prints) |
+
+**`scvError` decoding:** a contract-defined error (`ScError::Contract(u32)`) decodes to `"Error(Contract, #N)"`, where `N` is that contract's own error enum discriminant; every other `ScError` variant is a host-level error, decoding to `"Error(Type, Code)"` named after its XDR union arm (e.g. `"Error(WasmVm, MissingValue)"`). This used to fall through to `"[unsupported: scvError]"`, silently losing the actual error — not a theoretical gap: `scvError` genuinely shows up in a real diagnostic event's topics for any failed invocation (confirmed live against testnet: simulating a call to a non-existent method produces a diagnostic event topic that decodes to exactly `"Error(WasmVm, MissingValue)"`, matching what the Stellar CLI prints for the same failure).
 
 **Map key stringification:** object keys must be strings, so every decoded map key is stringified. A primitive key (Symbol/String/Address/number/bigint string/bool/null) uses plain `String()` coercion, giving clean keys like `"amount"`. A non-primitive key (a decoded `scvVec`/`scvMap` used as a map key) uses `JSON.stringify` instead — bare `String()` collapsed distinct structures to the same text (e.g. both `[1, 2]` and `["1,2"]` stringify to `"1,2"`), silently dropping one of the two entries with no error or warning. Confirmed live with exactly that fixture before fixing it.
 

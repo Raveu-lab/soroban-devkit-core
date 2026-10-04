@@ -108,6 +108,9 @@ export class EventDecoder {
       case xdr.ScValType.scvI256():
         return this.i256ToBigInt(val.i256()).toString();
 
+      case xdr.ScValType.scvError():
+        return this.scErrorToString(val.error());
+
       case xdr.ScValType.scvAddress():
         return Address.fromScAddress(val.address()).toString();
 
@@ -134,6 +137,23 @@ export class EventDecoder {
   /**
    * Decode an scvVec into an array of plain JavaScript values.
    */
+  /**
+   * Convert an ScError into the same "Error(Type, Code)" string the Stellar
+   * CLI itself prints — a contract-defined error is "Error(Contract, #N)"
+   * (N is the contract's own error enum discriminant), every other variant
+   * is a host-level error named after its XDR union arm, e.g.
+   * "Error(WasmVm, MissingValue)". scvError genuinely appears in real
+   * diagnostic event data from failed invocations, not just in theory.
+   */
+  private scErrorToString(error: xdr.ScError): string {
+    const kind = error.switch().name.replace(/^sce/, "");
+    if (error.switch().name === "sceContract") {
+      return `Error(${kind}, #${error.contractCode()})`;
+    }
+    const code = error.code().name.replace(/^scec/, "");
+    return `Error(${kind}, ${code})`;
+  }
+
   private decodeVec(val: xdr.ScVal): unknown[] {
     const vec = val.vec();
     return vec ? vec.map((v) => this.scValToJs(v)) : [];
