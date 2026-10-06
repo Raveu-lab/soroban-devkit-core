@@ -59,8 +59,30 @@ export class ContractSimulator {
       const response = await this.server.simulateTransaction(tx);
       return this.normalizeResponse(response);
     } catch (error) {
-      return this.normalizeSimulationError(error instanceof Error ? error.message : String(error));
+      return this.normalizeSimulationError(this.extractErrorMessage(error));
     }
+  }
+
+  /**
+   * Extract a human-readable message from a caught value of unknown shape.
+   * Public so it can be tested in isolation. `error instanceof Error ?
+   * error.message : String(error)` degrades to the literal string
+   * "[object Object]" for anything thrown that isn't a real Error
+   * instance — confirmed live: @stellar/stellar-sdk/contract's
+   * Client.from() throws a plain { code, message } object (not an Error)
+   * for a non-existent contract.
+   */
+  extractErrorMessage(error: unknown): string {
+    if (error instanceof Error) {
+      return error.message;
+    }
+    if (typeof error === "object" && error !== null && "message" in error) {
+      const message = (error as { message: unknown }).message;
+      if (typeof message === "string") {
+        return message;
+      }
+    }
+    return String(error);
   }
 
   /**

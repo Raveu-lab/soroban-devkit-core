@@ -41,6 +41,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `ArgEncoder`/`BindingGenerator` didn't recognize `M...` muxed addresses — they silently fell through to `scvString`/the literal TypeScript type `unknown` instead of `scvAddress`/`string`.
 - `ContractSimulator` let a muxed (`M...`) `caller` reach `server.getAccount()` directly, which rejected it with a raw strkey-decoding error (`invalid version byte. expected 48, got 96`) instead of a clear message explaining a muxed address can't be a transaction source account.
 - `EventDecoder.scValToJs` had no case for `scvError`, falling through to `[unsupported: scvError]` — not a theoretical gap, `scvError` genuinely appears in a real diagnostic event's topics for any failed invocation. Now decodes to the same `"Error(Contract, #N)"`/`"Error(Type, Code)"` format the Stellar CLI itself prints, confirmed against a real simulated failure on testnet.
+- `ContractSimulator.simulate()` and `ContractMonitor.emitError` both did `error instanceof Error ? error.message : String(error)` (or the `new Error(String(err))` equivalent), which degrades to the literal string `"[object Object]"` for anything thrown that isn't a real `Error` instance — confirmed live: `@stellar/stellar-sdk/contract`'s `Client.from()` throws a plain `{ code, message }` object for a non-existent contract. Both now use a public `extractErrorMessage` that checks for a string `.message` on any object first.
 
 ### Changed
 

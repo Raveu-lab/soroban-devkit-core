@@ -83,6 +83,36 @@ describe("ContractSimulator", () => {
     });
   });
 
+  describe("extractErrorMessage", () => {
+    it("returns a real Error's message", () => {
+      const sim = new ContractSimulator("testnet");
+      expect(sim.extractErrorMessage(new Error("boom"))).toBe("boom");
+    });
+
+    it("returns .message from a thrown plain object that isn't an Error instance", () => {
+      // @stellar/stellar-sdk/contract's Client.from() throws exactly this
+      // shape for a non-existent contract — confirmed live: a plain
+      // { code, message } object, not a real Error. simulate()'s catch
+      // block previously did `error instanceof Error ? error.message :
+      // String(error)`, which degrades this to "[object Object]".
+      const sim = new ContractSimulator("testnet");
+      const sdkStyleError = { code: 404, message: "Could not obtain contract hash from server" };
+      expect(sim.extractErrorMessage(sdkStyleError)).toBe(
+        "Could not obtain contract hash from server"
+      );
+    });
+
+    it("falls back to String() for a plain string throw", () => {
+      const sim = new ContractSimulator("testnet");
+      expect(sim.extractErrorMessage("just a string")).toBe("just a string");
+    });
+
+    it("falls back to String() for an object with no message property", () => {
+      const sim = new ContractSimulator("testnet");
+      expect(sim.extractErrorMessage({ code: 500 })).toBe("[object Object]");
+    });
+  });
+
   describe("simulate", () => {
     it("returns a failed result when the caller account does not exist on testnet", async () => {
       const sim = new ContractSimulator("testnet");

@@ -81,7 +81,7 @@ simulate(contractId, method, args, caller)
   └─ normalize response          → SimulationResult
 ```
 
-**Error handling:** All RPC errors and simulation failures are caught and returned as `{ success: false, error: string }` — never thrown to the caller.
+**Error handling:** All RPC errors and simulation failures are caught and returned as `{ success: false, error: string }` — never thrown to the caller. The catch block uses `extractErrorMessage` (public, tested in isolation) rather than `error instanceof Error ? error.message : String(error)`, which degraded to the literal string `"[object Object]"` for anything thrown that isn't a real `Error` — confirmed live: `@stellar/stellar-sdk/contract`'s `Client.from()` throws a plain `{ code, message }` object for a non-existent contract. `ContractMonitor.extractErrorMessage` (used by `emitError`) fixes the identical gap there.
 
 **Return value:** On success, `result.returnValue` holds the invocation's return value decoded via `EventDecoder.scValToJs` (the RPC response's `result.retval`, an `xdr.ScVal`) — `undefined` if the call wasn't an invocation (no `result` field). `ContractSimulator` holds an `EventDecoder` instance for this rather than duplicating the ScVal→JS type mapping.
 

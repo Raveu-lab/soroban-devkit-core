@@ -274,8 +274,31 @@ export class ContractMonitor {
   }
 
   private emitError(err: unknown): void {
-    const error = err instanceof Error ? err : new Error(String(err));
+    const error = err instanceof Error ? err : new Error(this.extractErrorMessage(err));
     this.errorCallbacks.forEach((cb) => cb(error));
+  }
+
+  /**
+   * Extract a human-readable message from a caught value of unknown shape.
+   * Public so it can be tested in isolation. The old `err instanceof Error
+   * ? err : new Error(String(err))` discarded a non-Error value's real
+   * .message and produced an Error whose own message was the literal
+   * string "[object Object]" — confirmed live elsewhere:
+   * @stellar/stellar-sdk/contract's Client.from() throws exactly this
+   * shape (a plain { code, message } object, not a real Error) for a
+   * non-existent contract.
+   */
+  extractErrorMessage(error: unknown): string {
+    if (error instanceof Error) {
+      return error.message;
+    }
+    if (typeof error === "object" && error !== null && "message" in error) {
+      const message = (error as { message: unknown }).message;
+      if (typeof message === "string") {
+        return message;
+      }
+    }
+    return String(error);
   }
 
   private async resolveStartLedger(): Promise<number> {

@@ -412,4 +412,29 @@ describe("ContractMonitor — additional edge cases", () => {
       expect((getEvents.mock.calls[2][0] as { startLedger: number }).startLedger).toBe(9001);
     });
   });
+
+  describe("extractErrorMessage", () => {
+    it("returns a real Error's message", () => {
+      const monitor = new ContractMonitor("testnet");
+      expect(monitor.extractErrorMessage(new Error("boom"))).toBe("boom");
+    });
+
+    it("returns .message from a thrown plain object that isn't an Error instance", () => {
+      // @stellar/stellar-sdk/contract's Client.from() throws exactly this
+      // shape for a non-existent contract — confirmed live. emitError's
+      // old `err instanceof Error ? err : new Error(String(err))`
+      // discarded this object's real .message and produced an Error
+      // whose own message was the literal string "[object Object]".
+      const monitor = new ContractMonitor("testnet");
+      const sdkStyleError = { code: 404, message: "Could not obtain contract hash from server" };
+      expect(monitor.extractErrorMessage(sdkStyleError)).toBe(
+        "Could not obtain contract hash from server"
+      );
+    });
+
+    it("falls back to String() for an object with no message property", () => {
+      const monitor = new ContractMonitor("testnet");
+      expect(monitor.extractErrorMessage({ code: 500 })).toBe("[object Object]");
+    });
+  });
 });
