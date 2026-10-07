@@ -21,6 +21,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Adaptive polling for `ContractMonitor` — the interval calibrates to real ledger close cadence instead of a fixed guess, when `pollingIntervalMs` is omitted.
 - `ArgEncoder`'s `{ $u32 | $u64 | $u128 | $u256: n }` hint — forces the unsigned XDR variant explicitly, since plain numbers/digit strings always infer signed by default.
 - `ContractSimulator.normalizeRestoreResponse()` — surfaces `needsRestore`/`restoreFee` on `SimulationResult` when a call needs archived data restored first, instead of a dead-end error.
+- `.github/PULL_REQUEST_TEMPLATE.md` — no PR template existed in any of the three sibling repos; mirrors `CONTRIBUTING.md`'s existing "Pull Request Guidelines" as a checklist.
 
 ### Fixed
 
