@@ -25,6 +25,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- The repo had no actual `LICENSE` file — `package.json` declared `"license": "MIT"`, but there was never an actual license grant for the code, only a field claiming one.
+
 - `EventDecoder.scValToJs` wasn't decoding `scvAddress` to its real strkey string.
 - `ContractMonitor`'s `eventFilter` option built an invalid RPC topic filter — it was silently never applied.
 - `ContractSimulator`'s `footprint.diskReadBytes`/`writeBytes` were fabricated placeholder values, not the real resource data from the simulation response.
