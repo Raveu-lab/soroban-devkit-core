@@ -21,9 +21,12 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Adaptive polling for `ContractMonitor` — the interval calibrates to real ledger close cadence instead of a fixed guess, when `pollingIntervalMs` is omitted.
 - `ArgEncoder`'s `{ $u32 | $u64 | $u128 | $u256: n }` hint — forces the unsigned XDR variant explicitly, since plain numbers/digit strings always infer signed by default.
 - `ContractSimulator.normalizeRestoreResponse()` — surfaces `needsRestore`/`restoreFee` on `SimulationResult` when a call needs archived data restored first, instead of a dead-end error.
+- `ArgEncoder` now encodes `scvBytes`: a `Uint8Array`/`Buffer` directly, or a `{ $bytes: "deadbeef" | [1, 2, 3] }` hint mirroring the existing `$u32`/`$u64`/`$u128`/`$u256` escape hatches. Hex may be `0x`-prefixed and is case-insensitive.
 - `.github/PULL_REQUEST_TEMPLATE.md` — no PR template existed in any of the three sibling repos; mirrors `CONTRIBUTING.md`'s existing "Pull Request Guidelines" as a checklist.
 
 ### Fixed
+
+- `ArgEncoder` had no path to `scvBytes` at all, so no contract function taking `Bytes`/`BytesN` could be called through this library, and every way of trying produced a silently wrong `ScVal` rather than an error. `EventDecoder` renders `scvBytes` as a hex string and `BindingGenerator` types a `Bytes`/`BytesN` parameter as `string`, so a caller naturally holds hex — which inferred as `scvSymbol` when short (`"deadbeef"`) and `scvString` at 64 characters (a `BytesN<32>` hash). A `Uint8Array`/`Buffer` was worse: it fell through to the plain-object branch and encoded as an `scvMap` of index to byte (`{"0":1,"1":2,"2":3}`). All four cases were accepted without complaint and failed later as an opaque host VM trap, the exact failure the `$u32`-style hints exist to prevent. Verified by round-tripping real `scvBytes` through `EventDecoder` and back.
 
 - The repo had no actual `LICENSE` file — `package.json` declared `"license": "MIT"`, but there was never an actual license grant for the code, only a field claiming one.
 

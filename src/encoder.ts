@@ -9,6 +9,7 @@ const UINT256_MAX = (1n << 256n) - 1n;
 const INT128_MAX = (1n << 127n) - 1n;
 const INT128_MIN = -(1n << 127n);
 const UNSIGNED_HINT_PATTERN = /^\$(u32|u64|u128|u256)$/;
+const HEX_PATTERN = /^[0-9a-fA-F]+$/;
 
 /**
  * ArgEncoder
@@ -26,10 +27,12 @@ const UNSIGNED_HINT_PATTERN = /^\$(u32|u64|u128|u256)$/;
  * - short [A-Za-z0-9_] string -> scvSymbol
  * - other string  -> scvString
  * - array         -> scvVec (each element encoded recursively)
+ * - Uint8Array/Buffer -> scvBytes
  * - { $u32: n }   -> scvU32 (single-key escape hatch — see below)
  * - { $u64: n }   -> scvU64
  * - { $u128: n }  -> scvU128
  * - { $u256: n }  -> scvU256
+ * - { $bytes: hex | number[] } -> scvBytes
  * - plain object  -> scvMap (keys encoded as scvSymbol, values recursively)
  *
  * Plain numbers and digit strings always infer the *signed* variant
@@ -42,6 +45,14 @@ const UNSIGNED_HINT_PATTERN = /^\$(u32|u64|u128|u256)$/;
  * explicitly. Collision with a genuine scvMap argument is possible in
  * principle but not realistic in practice (no real contract struct field is
  * named "$u32").
+ *
+ * Bytes have the same problem with no inference available at all: a hex
+ * string is indistinguishable from a Symbol or a String, so `"deadbeef"`
+ * infers scvSymbol and a 64-character hash infers scvString. Since
+ * EventDecoder renders scvBytes as hex and BindingGenerator types a
+ * Bytes/BytesN parameter as `string`, that is exactly the value a caller
+ * tends to have in hand. `{ $bytes: "deadbeef" }` (or a `number[]`, or a
+ * plain Uint8Array/Buffer, which is unambiguous) forces scvBytes.
  *
  * @example
  * ```ts
@@ -83,10 +94,16 @@ export class ArgEncoder {
       return xdr.ScVal.scvVec(value.map((item) => this.encode(item)));
     }
 
+    if (value instanceof Uint8Array) {
+      return xdr.ScVal.scvBytes(Buffer.from(value));
+    }
+
     if (typeof value === "object") {
       const obj = value as Record<string, unknown>;
-      const hint = this.tryEncodeUnsignedHint(obj);
-      if (hint) return hint;
+      const unsigned = this.tryEncodeUnsignedHint(obj);
+      if (unsigned) return unsigned;
+      const bytes = this.tryEncodeBytesHint(obj);
+      if (bytes) return bytes;
       return this.encodeObject(obj);
     }
 
@@ -184,6 +201,59 @@ export class ArgEncoder {
       case "u256":
         return this.encodeU256(raw);
     }
+  }
+
+  /**
+   * If `value` is a single-key `{ $bytes: ... }` object, encode it as scvBytes
+   * from either a hex string (optionally 0x-prefixed) or an array of byte
+   * values. Returns null for anything else.
+   *
+   * EventDecoder renders scvBytes as a hex string and BindingGenerator types
+   * a Bytes/BytesN parameter as `string`, so hex is the representation a
+   * caller already has in hand.
+   */
+  private tryEncodeBytesHint(value: Record<string, unknown>): xdr.ScVal | null {
+    const keys = Object.keys(value);
+    if (keys.length !== 1 || keys[0] !== "$bytes") return null;
+
+    const raw = value.$bytes;
+    if (typeof raw === "string") {
+      return xdr.ScVal.scvBytes(this.hexToBuffer(raw));
+    }
+    if (Array.isArray(raw)) {
+      return xdr.ScVal.scvBytes(this.byteArrayToBuffer(raw));
+    }
+    throw new Error(
+      `ArgEncoder: $bytes value must be a hex string or an array of bytes, got ${JSON.stringify(raw)}`
+    );
+  }
+
+  private hexToBuffer(raw: string): Buffer {
+    const hex = raw.startsWith("0x") || raw.startsWith("0X") ? raw.slice(2) : raw;
+    // Buffer.from(_, "hex") stops at the first non-hex character and returns a
+    // short buffer rather than throwing, so the input has to be checked here.
+    if (hex.length > 0 && !HEX_PATTERN.test(hex)) {
+      throw new Error(`ArgEncoder: $bytes value "${raw}" is not a hex string`);
+    }
+    if (hex.length % 2 !== 0) {
+      throw new Error(
+        `ArgEncoder: $bytes hex string "${raw}" has an odd number of digits — each byte needs two`
+      );
+    }
+    return Buffer.from(hex, "hex");
+  }
+
+  private byteArrayToBuffer(raw: unknown[]): Buffer {
+    return Buffer.from(
+      raw.map((byte) => {
+        if (typeof byte !== "number" || !Number.isInteger(byte) || byte < 0 || byte > 255) {
+          throw new Error(
+            `ArgEncoder: $bytes array element ${JSON.stringify(byte)} is not a byte value (0-255)`
+          );
+        }
+        return byte;
+      })
+    );
   }
 
   private toBigIntHint(raw: unknown, typeName: string): bigint {

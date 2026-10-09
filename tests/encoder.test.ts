@@ -264,4 +264,61 @@ describe("ArgEncoder", () => {
   it("throws on undefined", () => {
     expect(() => encoder.encode(undefined)).toThrow();
   });
+
+  describe("bytes", () => {
+    it("encodes a Uint8Array as scvBytes, not a map of index to byte", () => {
+      const val = encoder.encode(new Uint8Array([1, 2, 3]));
+      expect(val.switch()).toBe(xdr.ScValType.scvBytes());
+      expect(roundTrip(val)).toBe("010203");
+    });
+
+    it("encodes a Buffer as scvBytes", () => {
+      const val = encoder.encode(Buffer.from([0xde, 0xad, 0xbe, 0xef]));
+      expect(val.switch()).toBe(xdr.ScValType.scvBytes());
+      expect(roundTrip(val)).toBe("deadbeef");
+    });
+
+    it("encodes an empty Uint8Array as empty scvBytes", () => {
+      const val = encoder.encode(new Uint8Array([]));
+      expect(val.switch()).toBe(xdr.ScValType.scvBytes());
+      expect(roundTrip(val)).toBe("");
+    });
+
+    it("encodes { $bytes: hex } as scvBytes", () => {
+      const val = encoder.encode({ $bytes: "deadbeef" });
+      expect(val.switch()).toBe(xdr.ScValType.scvBytes());
+      expect(roundTrip(val)).toBe("deadbeef");
+    });
+
+    it("round-trips what the decoder emits for a BytesN<32>, which a binding types as string", () => {
+      const hash = "ab".repeat(32);
+      const val = encoder.encode({ $bytes: hash });
+      expect(val.switch()).toBe(xdr.ScValType.scvBytes());
+      expect(roundTrip(val)).toBe(hash);
+    });
+
+    it("accepts a 0x-prefixed hex string", () => {
+      expect(roundTrip(encoder.encode({ $bytes: "0xdeadbeef" }))).toBe("deadbeef");
+    });
+
+    it("accepts uppercase hex", () => {
+      expect(roundTrip(encoder.encode({ $bytes: "DEADBEEF" }))).toBe("deadbeef");
+    });
+
+    it("encodes { $bytes: [] } from a byte array", () => {
+      expect(roundTrip(encoder.encode({ $bytes: [1, 2, 3] }))).toBe("010203");
+    });
+
+    it("rejects an odd-length hex string rather than silently dropping a nibble", () => {
+      expect(() => encoder.encode({ $bytes: "abc" })).toThrow(/bytes/);
+    });
+
+    it("rejects a non-hex $bytes string", () => {
+      expect(() => encoder.encode({ $bytes: "nothex!" })).toThrow(/bytes/);
+    });
+
+    it("rejects a byte array value outside 0-255", () => {
+      expect(() => encoder.encode({ $bytes: [256] })).toThrow(/bytes/);
+    });
+  });
 });
