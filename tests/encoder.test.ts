@@ -265,6 +265,68 @@ describe("ArgEncoder", () => {
     expect(() => encoder.encode(undefined)).toThrow();
   });
 
+  describe("signed and time hints ($i64/$i256/$timepoint/$duration)", () => {
+    // BindingGenerator types every one of these as `string`, and a digit
+    // string infers scvI128 — so without a hint none of them is reachable.
+    it("encodes { $i64: n } as scvI64, not the default i128", () => {
+      const val = encoder.encode({ $i64: 1000 });
+      expect(val.switch()).toBe(xdr.ScValType.scvI64());
+      expect(roundTrip(val)).toBe("1000");
+    });
+
+    it("round-trips $i64 at exactly i64::MIN and i64::MAX", () => {
+      expect(roundTrip(encoder.encode({ $i64: "-9223372036854775808" }))).toBe(
+        "-9223372036854775808"
+      );
+      expect(roundTrip(encoder.encode({ $i64: "9223372036854775807" }))).toBe(
+        "9223372036854775807"
+      );
+    });
+
+    it("rejects an $i64 value outside the i64 range", () => {
+      expect(() => encoder.encode({ $i64: "9223372036854775808" })).toThrow(/i64/);
+      expect(() => encoder.encode({ $i64: "-9223372036854775809" })).toThrow(/i64/);
+    });
+
+    it("encodes { $i256: n } as scvI256, including a negative value", () => {
+      const val = encoder.encode({ $i256: "-1606938044258990275541962092341162602522202993782792835301383" });
+      expect(val.switch()).toBe(xdr.ScValType.scvI256());
+      expect(roundTrip(val)).toBe("-1606938044258990275541962092341162602522202993782792835301383");
+    });
+
+    it("round-trips $i256 at exactly i256::MIN and i256::MAX", () => {
+      const max = (2n ** 255n - 1n).toString();
+      const min = (-(2n ** 255n)).toString();
+      expect(roundTrip(encoder.encode({ $i256: max }))).toBe(max);
+      expect(roundTrip(encoder.encode({ $i256: min }))).toBe(min);
+    });
+
+    it("rejects an $i256 value outside the i256 range", () => {
+      expect(() => encoder.encode({ $i256: (2n ** 255n).toString() })).toThrow(/i256/);
+    });
+
+    it("encodes { $timepoint: n } as scvTimepoint, not a bare integer", () => {
+      const val = encoder.encode({ $timepoint: 1_760_000_000 });
+      expect(val.switch()).toBe(xdr.ScValType.scvTimepoint());
+      expect(roundTrip(val)).toBe("1760000000");
+    });
+
+    it("encodes { $duration: n } as scvDuration", () => {
+      const val = encoder.encode({ $duration: 86_400 });
+      expect(val.switch()).toBe(xdr.ScValType.scvDuration());
+      expect(roundTrip(val)).toBe("86400");
+    });
+
+    it("rejects a negative $timepoint or $duration, which are u64-based", () => {
+      expect(() => encoder.encode({ $timepoint: -1 })).toThrow(/timepoint/);
+      expect(() => encoder.encode({ $duration: -1 })).toThrow(/duration/);
+    });
+
+    it("rejects a $timepoint above u64::MAX", () => {
+      expect(() => encoder.encode({ $timepoint: "18446744073709551616" })).toThrow(/timepoint/);
+    });
+  });
+
   describe("bytes", () => {
     it("encodes a Uint8Array as scvBytes, not a map of index to byte", () => {
       const val = encoder.encode(new Uint8Array([1, 2, 3]));

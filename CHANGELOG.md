@@ -22,6 +22,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `ArgEncoder`'s `{ $u32 | $u64 | $u128 | $u256: n }` hint — forces the unsigned XDR variant explicitly, since plain numbers/digit strings always infer signed by default.
 - `ContractSimulator.normalizeRestoreResponse()` — surfaces `needsRestore`/`restoreFee` on `SimulationResult` when a call needs archived data restored first, instead of a dead-end error.
 - `ArgEncoder` now encodes `scvBytes`: a `Uint8Array`/`Buffer` directly, or a `{ $bytes: "deadbeef" | [1, 2, 3] }` hint mirroring the existing `$u32`/`$u64`/`$u128`/`$u256` escape hatches. Hex may be `0x`-prefixed and is case-insensitive.
+- `ArgEncoder`'s `{ $i64 | $i256 | $timepoint | $duration: n }` hints, completing the set. The existing hints only covered the unsigned integers, so these four types had no representation at all — `BindingGenerator` types each of them as `string`, and a digit string infers `scvI128`, so a `Timepoint`, `Duration`, `i64` or `i256` parameter silently received an `i128` and failed as an opaque host VM trap. `Timepoint`/`Duration` are u64-based and reject a negative value.
 - `.github/PULL_REQUEST_TEMPLATE.md` — no PR template existed in any of the three sibling repos; mirrors `CONTRIBUTING.md`'s existing "Pull Request Guidelines" as a checklist.
 
 ### Fixed
