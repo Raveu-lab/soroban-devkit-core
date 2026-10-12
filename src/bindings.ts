@@ -132,13 +132,19 @@ ${methods ? "\n" + methods + "\n" : ""}}
   }
 
   /**
-   * Build the expression passed to encodeArgs() for one argument. A plain
-   * number/digit string is ambiguous between the signed and unsigned ScVal
-   * variant — ArgEncoder always defaults to signed, which would send scvI32
-   * for a real u32 parameter and get rejected with an opaque host trap
-   * (confirmed against a live deployed contract). The on-chain spec tells
-   * us the true type here, so wrap unsigned args in ArgEncoder's $u32/$u64/
-   * $u128/$u256 hint instead of passing the raw name through.
+   * Build the expression passed to encodeArgs() for one argument.
+   *
+   * ArgEncoder has no spec to consult, so it can only infer: a plain number
+   * becomes scvI32 and a digit string becomes scvI128. Every other numeric
+   * width, the u64-based Timepoint/Duration, and Bytes are unreachable that
+   * way — a real u32 parameter receiving scvI32, or a Timepoint receiving
+   * i128, is rejected with an opaque host trap (confirmed against a live
+   * deployed contract). Bytes is worse: it's typed as `string` here, and
+   * hex infers scvSymbol when short and scvString at 64 characters.
+   *
+   * The on-chain spec does know the true type, so wrap the argument in the
+   * matching ArgEncoder hint rather than passing the raw name through. Only
+   * i32 and i128 need no hint, being exactly what inference already yields.
    */
   private argExpression(argName: string, type: xdr.ScSpecTypeDef): string {
     switch (type.switch()) {
@@ -150,6 +156,17 @@ ${methods ? "\n" + methods + "\n" : ""}}
         return `{ $u128: ${argName} }`;
       case xdr.ScSpecType.scSpecTypeU256():
         return `{ $u256: ${argName} }`;
+      case xdr.ScSpecType.scSpecTypeI64():
+        return `{ $i64: ${argName} }`;
+      case xdr.ScSpecType.scSpecTypeI256():
+        return `{ $i256: ${argName} }`;
+      case xdr.ScSpecType.scSpecTypeTimepoint():
+        return `{ $timepoint: ${argName} }`;
+      case xdr.ScSpecType.scSpecTypeDuration():
+        return `{ $duration: ${argName} }`;
+      case xdr.ScSpecType.scSpecTypeBytes():
+      case xdr.ScSpecType.scSpecTypeBytesN():
+        return `{ $bytes: ${argName} }`;
       default:
         return argName;
     }

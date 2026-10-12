@@ -144,7 +144,7 @@ export class ArgEncoder {
       if (parsed < INT128_MIN || parsed > INT128_MAX) {
         throw new Error(
           `ArgEncoder: ${value} is outside the i128 range [${INT128_MIN}, ${INT128_MAX}] — ` +
-            `pass a smaller value, or use the { $u128: n } / { $u256: n } hint if it's meant to be unsigned`
+            `pass a smaller value, or use the { $i256: n } hint, or { $u128: n } / { $u256: n } if it's meant to be unsigned`
         );
       }
       return xdr.ScVal.scvI128(this.bigIntToInt128Parts(parsed));

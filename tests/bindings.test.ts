@@ -153,14 +153,58 @@ describe("BindingGenerator.buildBindings", () => {
       expect(content).toContain("this.encoder.encodeArgs([{ $u256: amount }])");
     });
 
-    it("does not wrap a signed i32/i64/i128 arg — ArgEncoder's default already matches", () => {
+    it("does not wrap an i32/i128 arg — ArgEncoder's default already matches those two", () => {
+      // i64 is deliberately not in this list: a plain number infers scvI32
+      // and a digit string infers scvI128, so i64 needs its own hint like
+      // every other width. It used to be asserted as unwrapped here, which
+      // was only ever true in the sense that no $i64 hint existed yet.
       const spec = func("f", [
         input("a", xdr.ScSpecTypeDef.scSpecTypeI32()),
-        input("b", xdr.ScSpecTypeDef.scSpecTypeI64()),
         input("c", xdr.ScSpecTypeDef.scSpecTypeI128()),
       ]);
       const content = generator.buildBindings("CCNGT...", [spec]);
-      expect(content).toContain("this.encoder.encodeArgs([a, b, c])");
+      expect(content).toContain("this.encoder.encodeArgs([a, c])");
+    });
+
+    it("wraps an i64 arg in the $i64 hint — the default is scvI128, not scvI64", () => {
+      const spec = func("f", [input("delta", xdr.ScSpecTypeDef.scSpecTypeI64())]);
+      const content = generator.buildBindings("CCNGT...", [spec]);
+      expect(content).toContain("this.encoder.encodeArgs([{ $i64: delta }])");
+    });
+
+    it("wraps an i256 arg in the $i256 hint", () => {
+      const spec = func("f", [input("big", xdr.ScSpecTypeDef.scSpecTypeI256())]);
+      const content = generator.buildBindings("CCNGT...", [spec]);
+      expect(content).toContain("this.encoder.encodeArgs([{ $i256: big }])");
+    });
+
+    it("wraps a Timepoint arg in the $timepoint hint", () => {
+      // Deadlines, cliffs and expirations are declared as Timepoint, and
+      // this project's own vesting/escrow/dao-voting contracts are built on
+      // them — an unwrapped digit string reaches the contract as an i128.
+      const spec = func("f", [input("deadline", xdr.ScSpecTypeDef.scSpecTypeTimepoint())]);
+      const content = generator.buildBindings("CCNGT...", [spec]);
+      expect(content).toContain("this.encoder.encodeArgs([{ $timepoint: deadline }])");
+    });
+
+    it("wraps a Duration arg in the $duration hint", () => {
+      const spec = func("f", [input("lock", xdr.ScSpecTypeDef.scSpecTypeDuration())]);
+      const content = generator.buildBindings("CCNGT...", [spec]);
+      expect(content).toContain("this.encoder.encodeArgs([{ $duration: lock }])");
+    });
+
+    it("wraps a Bytes arg in the $bytes hint, since hex otherwise infers Symbol or String", () => {
+      const spec = func("f", [input("payload", xdr.ScSpecTypeDef.scSpecTypeBytes())]);
+      const content = generator.buildBindings("CCNGT...", [spec]);
+      expect(content).toContain("this.encoder.encodeArgs([{ $bytes: payload }])");
+    });
+
+    it("wraps a BytesN arg in the $bytes hint too — a 32-byte hash is the common case", () => {
+      const spec = func("f", [
+        input("hash", xdr.ScSpecTypeDef.scSpecTypeBytesN(new xdr.ScSpecTypeBytesN({ n: 32 }))),
+      ]);
+      const content = generator.buildBindings("CCNGT...", [spec]);
+      expect(content).toContain("this.encoder.encodeArgs([{ $bytes: hash }])");
     });
 
     it("mixes wrapped and unwrapped args in the same call, preserving order", () => {
