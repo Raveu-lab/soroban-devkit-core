@@ -6,6 +6,8 @@
 [![npm version](https://img.shields.io/npm/v/@soroban-devkit/core)](https://www.npmjs.com/package/@soroban-devkit/core)
 [![CI](https://github.com/Raveu-lab/soroban-devkit-core/actions/workflows/ci.yml/badge.svg)](https://github.com/Raveu-lab/soroban-devkit-core/actions)
 
+**▶ See it working:** `npm run build && node examples/walkthrough.js` — a read-only tour of all five classes against live testnet contracts. Source: [`examples/walkthrough.js`](examples/walkthrough.js).
+
 ---
 
 ## What is this?
