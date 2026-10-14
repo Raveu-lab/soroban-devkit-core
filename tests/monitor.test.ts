@@ -76,6 +76,25 @@ describe("ContractMonitor", () => {
       expect(monitor.buildEventFilters()).toEqual([]);
     });
 
+    it("still applies eventFilter when no contractIds are set", () => {
+      // contractIds is documented as "empty means watch all", so watching
+      // one event name across every contract is a supported combination.
+      // It used to fall into the no-contractIds early return and drop the
+      // topic filter entirely, turning `sdev monitor --filter transfer`
+      // into a firehose of every event on the network.
+      const monitor = new ContractMonitor("testnet");
+      monitor.watch({ eventFilter: "transfer" });
+      const filters = monitor.buildEventFilters();
+
+      expect(filters).toHaveLength(1);
+      expect(filters[0].contractIds).toBeUndefined();
+
+      const topicSegment = filters[0].topics?.[0]?.[0];
+      expect(topicSegment).toBeDefined();
+      const decoded = xdr.ScVal.fromXDR(topicSegment as string, "base64");
+      expect(decoded.sym().toString()).toBe("transfer");
+    });
+
     it("builds a contract filter for each contract ID", () => {
       const monitor = new ContractMonitor("testnet");
       monitor.watch({ contractIds: ["CABC", "CXYZ"] });

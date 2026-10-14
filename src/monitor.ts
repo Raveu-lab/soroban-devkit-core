@@ -105,16 +105,22 @@ export class ContractMonitor {
    * Public so it can be tested in isolation.
    */
   buildEventFilters(): rpc.Api.EventFilter[] {
-    if (!this.options.contractIds?.length) return [];
+    const contractIds = this.options.contractIds;
+    const eventFilter = this.options.eventFilter;
 
-    const filter: rpc.Api.EventFilter = {
-      type: "contract",
-      contractIds: this.options.contractIds,
-    };
+    // Either narrowing alone is enough to be worth sending. contractIds is
+    // documented as "empty means watch all", so an eventFilter on its own
+    // means one event name across every contract — requiring contractIds
+    // here would silently discard it and return every event instead.
+    if (!contractIds?.length && !eventFilter) return [];
 
-    if (this.options.eventFilter) {
-      const topicScVal = xdr.ScVal.scvSymbol(this.options.eventFilter).toXDR("base64");
-      filter.topics = [[topicScVal]];
+    const filter: rpc.Api.EventFilter = { type: "contract" };
+
+    if (contractIds?.length) {
+      filter.contractIds = contractIds;
+    }
+    if (eventFilter) {
+      filter.topics = [[xdr.ScVal.scvSymbol(eventFilter).toXDR("base64")]];
     }
 
     return [filter];
