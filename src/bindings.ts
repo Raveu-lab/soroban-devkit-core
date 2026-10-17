@@ -147,7 +147,15 @@ ${methods ? "\n" + methods + "\n" : ""}}
    * i32 and i128 need no hint, being exactly what inference already yields.
    */
   private argExpression(argName: string, type: xdr.ScSpecTypeDef): string {
-    switch (type.switch()) {
+    // scSpecTypeToTs looks inside Option<T> to type the parameter as
+    // `T | undefined`; the hint has to look inside it the same way, or an
+    // Option<u32>/Option<Timepoint>/etc. falls to the default case below
+    // and reaches ArgEncoder unwrapped — the same opaque host trap a bare
+    // u32 used to hit, just reachable through an optional parameter instead.
+    const innerType =
+      type.switch() === xdr.ScSpecType.scSpecTypeOption() ? type.option().valueType() : type;
+
+    switch (innerType.switch()) {
       case xdr.ScSpecType.scSpecTypeU32():
         return `{ $u32: ${argName} }`;
       case xdr.ScSpecType.scSpecTypeU64():

@@ -207,6 +207,38 @@ describe("BindingGenerator.buildBindings", () => {
       expect(content).toContain("this.encoder.encodeArgs([{ $bytes: hash }])");
     });
 
+    it("wraps an Option<u32> arg in the $u32 hint too, not just a bare u32", () => {
+      // argExpression switched on the top-level spec type, so an Option<u32>
+      // (switch() == scSpecTypeOption) fell to the default case and the arg
+      // went through unwrapped. scSpecTypeToTs already looks inside Option
+      // for the TS type (-> "number | undefined"); argExpression needs the
+      // same unwrapping for the hint, or a present value hits the same
+      // opaque host trap a bare u32 used to.
+      const optU32 = xdr.ScSpecTypeDef.scSpecTypeOption(
+        new xdr.ScSpecTypeOption({ valueType: xdr.ScSpecTypeDef.scSpecTypeU32() })
+      );
+      const content = generator.buildBindings("CCNGT...", [func("f", [input("max_age", optU32)])]);
+      expect(content).toContain("this.encoder.encodeArgs([{ $u32: max_age }])");
+    });
+
+    it("wraps an Option<Timepoint> arg in the $timepoint hint", () => {
+      const optTimepoint = xdr.ScSpecTypeDef.scSpecTypeOption(
+        new xdr.ScSpecTypeOption({ valueType: xdr.ScSpecTypeDef.scSpecTypeTimepoint() })
+      );
+      const content = generator.buildBindings("CCNGT...", [
+        func("f", [input("deadline", optTimepoint)]),
+      ]);
+      expect(content).toContain("this.encoder.encodeArgs([{ $timepoint: deadline }])");
+    });
+
+    it("does not wrap an Option<Address> — the inner type needs no hint", () => {
+      const optAddr = xdr.ScSpecTypeDef.scSpecTypeOption(
+        new xdr.ScSpecTypeOption({ valueType: xdr.ScSpecTypeDef.scSpecTypeAddress() })
+      );
+      const content = generator.buildBindings("CCNGT...", [func("f", [input("who", optAddr)])]);
+      expect(content).toContain("this.encoder.encodeArgs([who])");
+    });
+
     it("mixes wrapped and unwrapped args in the same call, preserving order", () => {
       const spec = func("vote", [
         input("proposal_id", xdr.ScSpecTypeDef.scSpecTypeU32()),
