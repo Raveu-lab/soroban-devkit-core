@@ -69,6 +69,12 @@ const HEX_PATTERN = /^[0-9a-fA-F]+$/;
  * const args = encoder.encodeArgs(["GABC...", "1000000"]);
  * await simulator.simulate(contractId, "transfer", args, caller);
  * ```
+ *
+ * @example Before/after for a real u32 parameter (e.g. dao-voting.get_proposal's `proposal_id`)
+ * ```ts
+ * encoder.encode(3);           // scvI32 — wrong for a u32 param, traps at call time
+ * encoder.encode({ $u32: 3 }); // scvU32 — correct
+ * ```
  */
 export class ArgEncoder {
   /**
