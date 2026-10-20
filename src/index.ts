@@ -11,3 +11,4 @@ export * from "./encoder";
 export * from "./monitor";
 export * from "./bindings";
 export * from "./decoded-value";
+export * from "./validation";
