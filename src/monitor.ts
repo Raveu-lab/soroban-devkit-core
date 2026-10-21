@@ -55,6 +55,7 @@ export class ContractMonitor {
   private lastLedger = 0;
   private pollTimer?: ReturnType<typeof setTimeout>;
   private lastLedgerSample?: LedgerSample;
+  private lastIntervalMs?: number;
 
   constructor(networkOrConfig: Network | NetworkConfig) {
     const config =
@@ -174,14 +175,28 @@ export class ContractMonitor {
    * Compute a polling interval, in ms, from two ledger samples — averaging
    * how long each ledger took to close between them. Clamped to
    * [MIN_POLL_MS, MAX_POLL_MS] to avoid pathological values from a single
-   * noisy sample. Falls back to DEFAULT_POLL_MS with no previous sample, or
-   * if the sequence didn't advance (shouldn't normally happen).
+   * noisy sample. Falls back to DEFAULT_POLL_MS with no previous sample.
+   *
+   * If the sequence didn't advance between samples, `previousIntervalMs` —
+   * the last real calibration, when one exists — is returned instead of
+   * resetting to DEFAULT_POLL_MS. This is not a rare case: measured against
+   * real testnet traffic, ledger close cadence (~5-6s) sits close enough to
+   * DEFAULT_POLL_MS (5000ms) that deltaSeq === 0 happens routinely at the
+   * default rate, not as a one-off. Resetting to the default every time
+   * that happens would discard a real calibration (e.g. 6000ms) for a
+   * guess, making the next poll land early again just as often —
+   * self-perpetuating jitter instead of settling near the real cadence.
+   *
    * Public so it can be tested in isolation without a network call.
    */
-  computeAdaptiveIntervalMs(previous: LedgerSample | undefined, current: LedgerSample): number {
+  computeAdaptiveIntervalMs(
+    previous: LedgerSample | undefined,
+    current: LedgerSample,
+    previousIntervalMs?: number
+  ): number {
     if (!previous) return DEFAULT_POLL_MS;
     const deltaSeq = current.sequence - previous.sequence;
-    if (deltaSeq <= 0) return DEFAULT_POLL_MS;
+    if (deltaSeq <= 0) return previousIntervalMs ?? DEFAULT_POLL_MS;
     const deltaMs = current.closeTimeMs - previous.closeTimeMs;
     const msPerLedger = deltaMs / deltaSeq;
     return Math.min(MAX_POLL_MS, Math.max(MIN_POLL_MS, Math.round(msPerLedger)));
@@ -206,8 +221,13 @@ export class ContractMonitor {
       sequence: raw.sequence,
       closeTimeMs: Number(raw.closeTime) * 1000,
     };
-    const interval = this.computeAdaptiveIntervalMs(this.lastLedgerSample, current);
+    const interval = this.computeAdaptiveIntervalMs(
+      this.lastLedgerSample,
+      current,
+      this.lastIntervalMs
+    );
     this.lastLedgerSample = current;
+    this.lastIntervalMs = interval;
     return interval;
   }
 

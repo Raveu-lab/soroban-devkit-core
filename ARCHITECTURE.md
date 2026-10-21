@@ -197,7 +197,9 @@ stop()
   └─ clearTimeout, set running = false
 ```
 
-**Adaptive polling interval (`resolvePollingIntervalMs`):** if `options.pollingIntervalMs` is set, it's used as-is — no RPC call. Otherwise, each cycle calls `getLatestLedger()` and calibrates against the *previous* cycle's sample: `msPerLedger = (closeTimeB - closeTimeA) / (sequenceB - sequenceA)`, clamped to `[2000, 30000]`ms (`computeAdaptiveIntervalMs`, pure and testable in isolation). Falls back to a 5000ms default with no prior sample, or if the sequence didn't advance.
+**Adaptive polling interval (`resolvePollingIntervalMs`):** if `options.pollingIntervalMs` is set, it's used as-is — no RPC call. Otherwise, each cycle calls `getLatestLedger()` and calibrates against the *previous* cycle's sample: `msPerLedger = (closeTimeB - closeTimeA) / (sequenceB - sequenceA)`, clamped to `[2000, 30000]`ms (`computeAdaptiveIntervalMs`, pure and testable in isolation). Falls back to a 5000ms default with no prior sample at all.
+
+If the ledger sequence didn't advance between two samples, the *previous real calibration* is kept rather than reset to the 5000ms default. Measured against real testnet traffic: ledger close cadence (~5-6s) sits close enough to the 5000ms default that this isn't the rare case the comment here used to claim — it happens routinely at the default rate. Resetting to 5000ms every time would discard a real 6000ms calibration for a guess that's itself likely to land early again, causing jitter instead of settling near the true cadence.
 
 `GetLatestLedgerResponse.closeTime` (unix seconds, as a string) is properly declared as of `@stellar/stellar-sdk` 15+ — earlier versions' types omitted it despite the live RPC response always including it, which required a narrow local cast; no longer needed after the 2026-09-12 SDK upgrade.
 
@@ -206,6 +208,7 @@ stop()
 - `lastLedger: number` — cursor to avoid re-processing events
 - `pollTimer` — timeout handle
 - `lastLedgerSample?: { sequence, closeTimeMs }` — for adaptive interval calibration
+- `lastIntervalMs?: number` — the last real calibration, kept when a poll's ledger sequence doesn't advance instead of resetting to the 5000ms default
 - `eventCallbacks[]` / `errorCallbacks[]` — registered listeners
 
 **Concurrency:** Single polling loop. The next poll only starts after the current one completes (via `.finally()`), preventing overlapping requests.

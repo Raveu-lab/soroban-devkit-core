@@ -290,10 +290,35 @@ describe("ContractMonitor — additional edge cases", () => {
       expect(result).toBe(30000);
     });
 
-    it("falls back to the default if the ledger sequence didn't advance", () => {
+    it("falls back to the default if the ledger sequence didn't advance and there's no prior calibration", () => {
       const result = monitor.computeAdaptiveIntervalMs(
         { sequence: 100, closeTimeMs: 1_000_000 },
         { sequence: 100, closeTimeMs: 1_010_000 }
+      );
+      expect(result).toBe(5000);
+    });
+
+    it("keeps the last calibrated interval if the sequence didn't advance, instead of resetting to the default", () => {
+      // Testnet's real ledger close cadence (measured: ~5-6s) sits close
+      // enough to DEFAULT_POLL_MS (5000ms) that deltaSeq === 0 happens
+      // routinely at the default rate, not as the rare case the old
+      // docstring described ("shouldn't normally happen"). Discarding a
+      // real 6000ms calibration and resetting to 5000ms every time that
+      // happens makes the next poll more likely to land early again —
+      // self-perpetuating jitter instead of settling near the real cadence.
+      const result = monitor.computeAdaptiveIntervalMs(
+        { sequence: 100, closeTimeMs: 1_000_000 },
+        { sequence: 100, closeTimeMs: 1_003_000 },
+        6000
+      );
+      expect(result).toBe(6000);
+    });
+
+    it("still falls back to the default if the sequence didn't advance and no prior interval was passed", () => {
+      const result = monitor.computeAdaptiveIntervalMs(
+        { sequence: 100, closeTimeMs: 1_000_000 },
+        { sequence: 100, closeTimeMs: 1_003_000 },
+        undefined
       );
       expect(result).toBe(5000);
     });
@@ -335,6 +360,23 @@ describe("ContractMonitor — additional edge cases", () => {
       expect(spy).toHaveBeenCalledTimes(2);
       expect(first).toBe(5000); // no prior sample yet
       expect(second).toBe(7000); // (1007 - 1000) * 1000ms / 1 ledger
+    });
+
+    it("keeps a real calibration across a poll where the ledger didn't advance", async () => {
+      const monitor = new ContractMonitor("testnet");
+      monitor.watch({});
+      jest
+        .spyOn(monitor.getServer(), "getLatestLedger")
+        .mockResolvedValueOnce({ id: "a", protocolVersion: "21", sequence: 100, closeTime: "1000" } as never)
+        .mockResolvedValueOnce({ id: "b", protocolVersion: "21", sequence: 101, closeTime: "1006" } as never)
+        .mockResolvedValueOnce({ id: "c", protocolVersion: "21", sequence: 101, closeTime: "1009" } as never);
+
+      await monitor.resolvePollingIntervalMs(); // 5000ms, no prior sample
+      const second = await monitor.resolvePollingIntervalMs(); // 6000ms, real calibration
+      const third = await monitor.resolvePollingIntervalMs(); // sequence stalled at 101
+
+      expect(second).toBe(6000);
+      expect(third).toBe(6000); // keeps the real calibration, not the 5000ms default
     });
 
     it("falls back to the default if closeTime is absent from the response", async () => {
