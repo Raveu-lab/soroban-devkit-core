@@ -139,8 +139,11 @@ ${methods ? "\n" + methods + "\n" : ""}}
    * width, the u64-based Timepoint/Duration, and Bytes are unreachable that
    * way — a real u32 parameter receiving scvI32, or a Timepoint receiving
    * i128, is rejected with an opaque host trap (confirmed against a live
-   * deployed contract). Bytes is worse: it's typed as `string` here, and
-   * hex infers scvSymbol when short and scvString at 64 characters.
+   * deployed contract). Bytes and String are worse: both are typed as
+   * `string` here with no inference available at all — hex infers scvSymbol
+   * when short and scvString at 64 characters, and a String parameter's own
+   * value infers scvSymbol whenever it happens to be short and
+   * alphanumeric, confirmed live against dao-voting.propose's `description`.
    *
    * The on-chain spec does know the true type, so wrap the argument in the
    * matching ArgEncoder hint rather than passing the raw name through. Only
@@ -175,6 +178,8 @@ ${methods ? "\n" + methods + "\n" : ""}}
       case xdr.ScSpecType.scSpecTypeBytes():
       case xdr.ScSpecType.scSpecTypeBytesN():
         return `{ $bytes: ${argName} }`;
+      case xdr.ScSpecType.scSpecTypeString():
+        return `{ $string: ${argName} }`;
       default:
         return argName;
     }

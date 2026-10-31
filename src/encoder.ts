@@ -41,6 +41,7 @@ const HEX_PATTERN = /^[0-9a-fA-F]+$/;
  * - { $timepoint: n } -> scvTimepoint
  * - { $duration: n }  -> scvDuration
  * - { $bytes: hex | number[] } -> scvBytes
+ * - { $string: "..." } -> scvString
  * - plain object  -> scvMap (keys encoded as scvSymbol, values recursively)
  *
  * Plain numbers and digit strings always infer i32 or i128 — there's no
@@ -63,6 +64,16 @@ const HEX_PATTERN = /^[0-9a-fA-F]+$/;
  * tends to have in hand. `{ $bytes: "deadbeef" }` (or a `number[]`, or a
  * plain Uint8Array/Buffer, which is unambiguous) forces scvBytes.
  *
+ * Strings have a mirror-image problem: a String-typed contract parameter
+ * is also typed as `string` with no spec available here, and the default
+ * inference order (Symbol pattern checked before falling back to String)
+ * means any short `[A-Za-z0-9_]` value — exactly what a real user types
+ * for something like a proposal description — infers as scvSymbol, and a
+ * digit string infers as scvI128, instead of the scvString the contract
+ * actually expects. Confirmed live: dao-voting.propose's `description`
+ * parameter traps on `"upgrade_treasury"` unwrapped. `{ $string: "..." }`
+ * forces scvString regardless of shape.
+ *
  * @example
  * ```ts
  * const encoder = new ArgEncoder();
@@ -74,6 +85,12 @@ const HEX_PATTERN = /^[0-9a-fA-F]+$/;
  * ```ts
  * encoder.encode(3);           // scvI32 — wrong for a u32 param, traps at call time
  * encoder.encode({ $u32: 3 }); // scvU32 — correct
+ * ```
+ *
+ * @example Before/after for a real String parameter (dao-voting.propose's `description`)
+ * ```ts
+ * encoder.encode("upgrade_treasury");             // scvSymbol — wrong for a String param, traps at call time
+ * encoder.encode({ $string: "upgrade_treasury" }); // scvString — correct
  * ```
  */
 export class ArgEncoder {
@@ -119,6 +136,8 @@ export class ArgEncoder {
       if (numeric) return numeric;
       const bytes = this.tryEncodeBytesHint(obj);
       if (bytes) return bytes;
+      const str = this.tryEncodeStringHint(obj);
+      if (str) return str;
       return this.encodeObject(obj);
     }
 
@@ -290,6 +309,30 @@ export class ArgEncoder {
     throw new Error(
       `ArgEncoder: $bytes value must be a hex string or an array of bytes, got ${JSON.stringify(raw)}`
     );
+  }
+
+  /**
+   * If `value` is a single-key `{ $string: "..." }` object, encode it as
+   * scvString regardless of what it would otherwise infer as. Returns null
+   * for anything else.
+   *
+   * `encodeString` checks the Symbol pattern before falling back to
+   * scvString, so any short value made only of `[A-Za-z0-9_]` characters —
+   * exactly the shape a real user types for something like a proposal
+   * description — infers as scvSymbol, and a digit string infers as
+   * scvI128, even when the target parameter is actually a String. A real
+   * contract call with the wrong type fails with an opaque host VM trap,
+   * not a clear encoding error.
+   */
+  private tryEncodeStringHint(value: Record<string, unknown>): xdr.ScVal | null {
+    const keys = Object.keys(value);
+    if (keys.length !== 1 || keys[0] !== "$string") return null;
+
+    const raw = value.$string;
+    if (typeof raw !== "string") {
+      throw new Error(`ArgEncoder: $string value must be a string, got ${JSON.stringify(raw)}`);
+    }
+    return xdr.ScVal.scvString(Buffer.from(raw));
   }
 
   private hexToBuffer(raw: string): Buffer {

@@ -199,6 +199,15 @@ describe("BindingGenerator.buildBindings", () => {
       expect(content).toContain("this.encoder.encodeArgs([{ $bytes: payload }])");
     });
 
+    it("wraps a String arg in the $string hint, since a short value otherwise infers Symbol", () => {
+      // Confirmed live against dao-voting.propose(description: String, ...):
+      // a short alphanumeric description traps unwrapped, inferring as
+      // scvSymbol instead of the scvString the parameter actually is.
+      const spec = func("f", [input("description", xdr.ScSpecTypeDef.scSpecTypeString())]);
+      const content = generator.buildBindings("CCNGT...", [spec]);
+      expect(content).toContain("this.encoder.encodeArgs([{ $string: description }])");
+    });
+
     it("wraps a BytesN arg in the $bytes hint too — a 32-byte hash is the common case", () => {
       const spec = func("f", [
         input("hash", xdr.ScSpecTypeDef.scSpecTypeBytesN(new xdr.ScSpecTypeBytesN({ n: 32 }))),

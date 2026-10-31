@@ -327,6 +327,36 @@ describe("ArgEncoder", () => {
     });
   });
 
+  describe("forcing scvString over the default Symbol/String inference", () => {
+    // encodeString checks the Symbol pattern before falling back to
+    // scvString, so any short [A-Za-z0-9_] value — exactly the shape a
+    // real user types for something like a proposal description —
+    // infers as scvSymbol even when the target parameter is a String.
+    // Confirmed live against dao-voting.propose(description: String, ...):
+    // "upgrade_treasury" traps with UnreachableCodeReached unwrapped.
+    it("encodes a short alphanumeric value as scvString via the $string hint, not scvSymbol", () => {
+      const val = encoder.encode({ $string: "upgrade_treasury" });
+      expect(val.switch()).toBe(xdr.ScValType.scvString());
+      expect(roundTrip(val)).toBe("upgrade_treasury");
+    });
+
+    it("encodes a digit string as scvString via the hint, not scvI128", () => {
+      const val = encoder.encode({ $string: "12345" });
+      expect(val.switch()).toBe(xdr.ScValType.scvString());
+      expect(roundTrip(val)).toBe("12345");
+    });
+
+    it("encodes an empty string as scvString via the hint", () => {
+      const val = encoder.encode({ $string: "" });
+      expect(val.switch()).toBe(xdr.ScValType.scvString());
+      expect(roundTrip(val)).toBe("");
+    });
+
+    it("rejects a non-string $string value", () => {
+      expect(() => encoder.encode({ $string: 5 })).toThrow(/\$string/);
+    });
+  });
+
   describe("bytes", () => {
     it("encodes a Uint8Array as scvBytes, not a map of index to byte", () => {
       const val = encoder.encode(new Uint8Array([1, 2, 3]));
