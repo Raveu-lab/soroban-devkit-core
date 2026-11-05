@@ -328,7 +328,7 @@ describe("ContractMonitor — additional edge cases", () => {
     it("returns the explicit pollingIntervalMs without calling the RPC", async () => {
       const monitor = new ContractMonitor("testnet");
       monitor.watch({ pollingIntervalMs: 9000 });
-      const spy = jest.spyOn(monitor.getServer(), "getLatestLedger");
+      const spy = jest.spyOn(monitor.getServer(), "getHealth");
 
       const result = await monitor.resolvePollingIntervalMs();
 
@@ -340,18 +340,20 @@ describe("ContractMonitor — additional edge cases", () => {
       const monitor = new ContractMonitor("testnet");
       monitor.watch({});
       const spy = jest
-        .spyOn(monitor.getServer(), "getLatestLedger")
+        .spyOn(monitor.getServer(), "getHealth")
         .mockResolvedValueOnce({
-          id: "a",
-          protocolVersion: "21",
-          sequence: 100,
-          closeTime: "1000",
+          status: "healthy",
+          latestLedger: 100,
+          latestLedgerCloseTime: "1000",
+          oldestLedger: 1,
+          ledgerRetentionWindow: 1000,
         } as never)
         .mockResolvedValueOnce({
-          id: "b",
-          protocolVersion: "21",
-          sequence: 101,
-          closeTime: "1007",
+          status: "healthy",
+          latestLedger: 101,
+          latestLedgerCloseTime: "1007",
+          oldestLedger: 1,
+          ledgerRetentionWindow: 1000,
         } as never);
 
       const first = await monitor.resolvePollingIntervalMs();
@@ -366,10 +368,10 @@ describe("ContractMonitor — additional edge cases", () => {
       const monitor = new ContractMonitor("testnet");
       monitor.watch({});
       jest
-        .spyOn(monitor.getServer(), "getLatestLedger")
-        .mockResolvedValueOnce({ id: "a", protocolVersion: "21", sequence: 100, closeTime: "1000" } as never)
-        .mockResolvedValueOnce({ id: "b", protocolVersion: "21", sequence: 101, closeTime: "1006" } as never)
-        .mockResolvedValueOnce({ id: "c", protocolVersion: "21", sequence: 101, closeTime: "1009" } as never);
+        .spyOn(monitor.getServer(), "getHealth")
+        .mockResolvedValueOnce({ status: "healthy", latestLedger: 100, latestLedgerCloseTime: "1000", oldestLedger: 1, ledgerRetentionWindow: 1000 } as never)
+        .mockResolvedValueOnce({ status: "healthy", latestLedger: 101, latestLedgerCloseTime: "1006", oldestLedger: 1, ledgerRetentionWindow: 1000 } as never)
+        .mockResolvedValueOnce({ status: "healthy", latestLedger: 101, latestLedgerCloseTime: "1009", oldestLedger: 1, ledgerRetentionWindow: 1000 } as never);
 
       await monitor.resolvePollingIntervalMs(); // 5000ms, no prior sample
       const second = await monitor.resolvePollingIntervalMs(); // 6000ms, real calibration
@@ -379,19 +381,37 @@ describe("ContractMonitor — additional edge cases", () => {
       expect(third).toBe(6000); // keeps the real calibration, not the 5000ms default
     });
 
-    it("falls back to the default if closeTime is absent from the response", async () => {
+    it("falls back to the default if latestLedgerCloseTime is absent from the response", async () => {
       const monitor = new ContractMonitor("testnet");
       monitor.watch({});
-      jest.spyOn(monitor.getServer(), "getLatestLedger").mockResolvedValueOnce({
-        id: "a",
-        protocolVersion: "21",
-        sequence: 100,
+      jest.spyOn(monitor.getServer(), "getHealth").mockResolvedValueOnce({
+        status: "healthy",
+        latestLedger: 100,
+        oldestLedger: 1,
+        ledgerRetentionWindow: 1000,
       } as never);
 
       const result = await monitor.resolvePollingIntervalMs();
 
       expect(result).toBe(5000);
     });
+
+    it("calibrates correctly against the real live RPC, not just mocks", async () => {
+      // server.getLatestLedger() parses the response's headerXdr into a
+      // full structured object internally, which started failing against
+      // real testnet with "XDR Read Error: unknown StellarValueType member
+      // for value 3" — the pinned SDK can't parse a StellarValue variant
+      // the live network now actually produces. This broke every default
+      // (adaptive) sdev monitor invocation: resolvePollingIntervalMs threw
+      // on its first call, and since nothing upstream of it catches that,
+      // the whole monitor process crashed with a blank error message.
+      // getHealth()'s response needs no such parsing — it's a few plain
+      // JSON fields — and genuinely works against the real network right
+      // now, confirmed directly: resolvePollingIntervalMs must not throw.
+      const monitor = new ContractMonitor("testnet");
+      monitor.watch({});
+      await expect(monitor.resolvePollingIntervalMs()).resolves.toEqual(expect.any(Number));
+    }, 15000);
   });
 
   describe("fetchAndEmitEvents", () => {

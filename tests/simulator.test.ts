@@ -114,7 +114,15 @@ describe("ContractSimulator", () => {
   });
 
   describe("simulate", () => {
-    it("returns a failed result when the caller account does not exist on testnet", async () => {
+    it("returns a failed result for a fabricated all-same-char public key", async () => {
+      // This key's own title used to say "the caller account does not exist
+      // on testnet", but that's no longer true: against the real live
+      // network, this exact all-A's key now resolves as a real account
+      // (confirmed directly — getAccount succeeds), so the failure comes
+      // from the contract's own missing storage value, not a missing
+      // account. Kept as a regression guard on *some* failure surfacing
+      // correctly, but it can no longer assert "Account not found" text —
+      // see the dedicated unreachable-RPC test below for that path instead.
       const sim = new ContractSimulator("testnet");
       const result = await sim.simulate(
         "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
@@ -125,6 +133,31 @@ describe("ContractSimulator", () => {
       expect(result.success).toBe(false);
       expect(result.error).toBeDefined();
     }, 15000);
+
+    it("distinguishes an unreachable RPC endpoint from a genuinely missing account", async () => {
+      // @stellar/stellar-sdk's Server.getAccount() catches every failure —
+      // a real missing account, a DNS failure, a connection refused — and
+      // rethrows all of them as the identical "Account not found: <key>"
+      // message, discarding the actual cause. Confirmed directly against
+      // the real SDK: a totally unreachable RPC host (DNS never resolves,
+      // by RFC 2606's reserved .invalid TLD) produces word-for-word the
+      // same message as a real 404. A user pointing --rpc-url at a typo'd
+      // host gets told their own account doesn't exist.
+      const sim = new ContractSimulator({
+        network: "testnet",
+        rpcUrl: "https://this-host-does-not-exist-12345.invalid",
+        networkPassphrase: NETWORK_CONFIGS.testnet.networkPassphrase,
+      });
+      const result = await sim.simulate(
+        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+        "ping",
+        [],
+        "GC3BJ52UL6CBAJBSZRX5DIPHXUW6OGJFVWMQKV3GLBMXHEZ66BWLXZN6" // a real, existing account
+      );
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/rpc endpoint/i);
+      expect(result.error).not.toMatch(/^Account not found/);
+    }, 20000);
 
     it("gives a clear error for a muxed (M...) caller, not the raw strkey decode failure", async () => {
       // ArgEncoder now encodes M... addresses correctly as contract call

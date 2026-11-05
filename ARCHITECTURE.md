@@ -89,6 +89,8 @@ simulate(contractId, method, args, caller)
 
 **Muxed (M...) callers:** `ArgEncoder` correctly encodes an `M...` muxed address as a contract call *argument* (see `encoder.ts`), which makes it a natural thing for someone to also try as `caller` — but a muxed address can't be a transaction's *source account*. `fetchSequenceNumber` previously let this reach `server.getAccount()` directly, which rejected it with a raw strkey-decoding error (`invalid version byte. expected 48, got 96`) that gives no indication what's wrong or what to do about it — confirmed live before fixing. It's now checked explicitly first, with a clear error naming the actual problem.
 
+**Disambiguating "Account not found" (2026-11-04):** `server.getAccount()` catches every failure underneath it — a real missing account, a DNS failure, a connection refused, a timeout — and rethrows all of them as the identical `"Account not found: <key>"` message, discarding which one actually happened (confirmed directly: the thrown error carries no `.cause`, only `stack`/`message`; and a totally unreachable RPC host produces word-for-word the same message as a real 404). A typo'd `--rpc-url` was reported as "your account doesn't exist" instead of "the endpoint is unreachable". `fetchSequenceNumber` now routes that exact message through `disambiguateAccountNotFound`, which probes `server.getHealth()` (not `getLatestLedger()` — see the `ContractMonitor` section above for why) to tell a genuinely missing account apart from an unreachable RPC, and rewrites the message only in the latter case. Adds one extra round trip solely to that failure path — never to a successful call or an unrelated error shape.
+
 **State:** Stateless. A new `rpc.Server` instance is created per `ContractSimulator` instance.
 
 **Cost/footprint fields:** `footprint` is `{ diskReadBytes, writeBytes, instructions }` from `response.transactionData.build().resources()`. `cost` is `{ minResourceFee }` (stroops, from `response.minResourceFee`) — the RPC response's old `cost.cpuInsns`/`cost.memBytes` fields (and `resources().readBytes()`, renamed `diskReadBytes()`) no longer exist as of the current Soroban RPC protocol; confirmed against a live testnet response, not just the SDK's types.
@@ -182,7 +184,7 @@ Throws for values with no sensible inferred type (`undefined`, non-integer numbe
 ```
 start()
   │
-  ├─ getLatestLedger()           → set lastLedger cursor
+  ├─ getHealth()                 → set lastLedger cursor
   └─ schedulePoll() → resolvePollingIntervalMs() → setTimeout(runPollCycle, interval)
        │
        └─ runPollCycle()
@@ -197,11 +199,13 @@ stop()
   └─ clearTimeout, set running = false
 ```
 
-**Adaptive polling interval (`resolvePollingIntervalMs`):** if `options.pollingIntervalMs` is set, it's used as-is — no RPC call. Otherwise, each cycle calls `getLatestLedger()` and calibrates against the *previous* cycle's sample: `msPerLedger = (closeTimeB - closeTimeA) / (sequenceB - sequenceA)`, clamped to `[2000, 30000]`ms (`computeAdaptiveIntervalMs`, pure and testable in isolation). Falls back to a 5000ms default with no prior sample at all.
+**Adaptive polling interval (`resolvePollingIntervalMs`):** if `options.pollingIntervalMs` is set, it's used as-is — no RPC call. Otherwise, each cycle calls `getHealth()` and calibrates against the *previous* cycle's sample: `msPerLedger = (closeTimeB - closeTimeA) / (sequenceB - sequenceA)`, clamped to `[2000, 30000]`ms (`computeAdaptiveIntervalMs`, pure and testable in isolation). Falls back to a 5000ms default with no prior sample at all.
 
 If the ledger sequence didn't advance between two samples, the *previous real calibration* is kept rather than reset to the 5000ms default. Measured against real testnet traffic: ledger close cadence (~5-6s) sits close enough to the 5000ms default that this isn't the rare case the comment here used to claim — it happens routinely at the default rate. Resetting to 5000ms every time would discard a real 6000ms calibration for a guess that's itself likely to land early again, causing jitter instead of settling near the true cadence.
 
-`GetLatestLedgerResponse.closeTime` (unix seconds, as a string) is properly declared as of `@stellar/stellar-sdk` 15+ — earlier versions' types omitted it despite the live RPC response always including it, which required a narrow local cast; no longer needed after the 2026-09-12 SDK upgrade.
+**Why `getHealth()`, not `getLatestLedger()` (2026-11-04):** both `resolvePollingIntervalMs()` and `resolveStartLedger()` used to call `getLatestLedger()`. That method parses a `headerXdr` blob through `@stellar/js-xdr`, which started throwing `XDR Read Error: unknown StellarValueType member for value 3` against real current testnet — confirmed live, reproducible every time, not intermittent — because the pinned `@stellar/stellar-sdk` version can't decode a `StellarValueType` variant the network now actually produces. This broke every default (no `--interval`) `sdev monitor` invocation outright: the very first `resolvePollingIntervalMs()` call threw, nothing upstream caught it, and the process died with a blank error. `getHealth()` reports the same `latestLedger` sequence and close time as plain JSON fields — no XDR parsing — so it's unaffected. This is the same root cause tracked as a deferred `@stellar/stellar-sdk` v17 migration in `CHANGELOG.md`'s Known Issues, except this is now a live functional break, not just a security-advisory concern.
+
+`GetLatestLedgerResponse.closeTime` (unix seconds, as a string) is properly declared as of `@stellar/stellar-sdk` 15+ — earlier versions' types omitted it despite the live RPC response always including it, which required a narrow local cast; no longer needed after the 2026-09-12 SDK upgrade. `GetHealthResponse.latestLedgerCloseTime` has the same gap today — the SDK's own `.d.ts` still omits it even though the real runtime response always includes it — so `monitor.ts` casts it locally the same way.
 
 **State:** Stateful. Holds:
 - `running: boolean`

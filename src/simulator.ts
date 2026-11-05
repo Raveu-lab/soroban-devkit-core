@@ -192,8 +192,45 @@ export class ContractSimulator {
         "ContractSimulator: a muxed (M...) address can't be used as the transaction source account — pass the underlying G... account as the caller instead."
       );
     }
-    const account = await this.server.getAccount(publicKey);
-    return account.sequenceNumber();
+    try {
+      const account = await this.server.getAccount(publicKey);
+      return account.sequenceNumber();
+    } catch (error) {
+      throw await this.disambiguateAccountNotFound(error, publicKey);
+    }
+  }
+
+  /**
+   * `server.getAccount()` catches every failure underneath it — a real
+   * missing account, a DNS failure, a connection refused, a timeout — and
+   * rethrows all of them as the identical "Account not found: <key>"
+   * message, discarding which one actually happened. Confirmed directly
+   * against the SDK: a totally unreachable RPC host produces word-for-word
+   * the same error as a real 404, so a typo'd --rpc-url gets reported as
+   * "your account doesn't exist" instead of "the endpoint is unreachable".
+   *
+   * Only triggers on that exact message, so it adds one extra round trip
+   * solely to the failure path this ambiguity affects — never to a
+   * successful call, and never to an unrelated error shape.
+   */
+  private async disambiguateAccountNotFound(error: unknown, publicKey: string): Promise<Error> {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!message.startsWith("Account not found")) {
+      return error instanceof Error ? error : new Error(message);
+    }
+    try {
+      // getHealth(), not getLatestLedger(): getLatestLedger() parses a
+      // headerXdr blob through @stellar/js-xdr, which throws its own
+      // "unknown StellarValueType member for value 3" against real current
+      // testnet (confirmed live) — that would make a healthy, reachable RPC
+      // look unreachable here. getHealth() needs no XDR parsing.
+      await this.server.getHealth();
+      return new Error(message); // RPC is reachable — the account genuinely doesn't exist.
+    } catch {
+      return new Error(
+        `ContractSimulator: the RPC endpoint (${this.config.rpcUrl}) could not be reached, so it's unclear whether "${publicKey}" exists. Check --rpc-url / the configured network.`
+      );
+    }
   }
 
   /**

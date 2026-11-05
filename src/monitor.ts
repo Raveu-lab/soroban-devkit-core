@@ -205,7 +205,15 @@ export class ContractMonitor {
   /**
    * Resolve how long to wait before the next poll. If the caller set an
    * explicit `pollingIntervalMs`, that's used as-is (no RPC call). Otherwise,
-   * calibrates against real ledger close cadence via getLatestLedger().
+   * calibrates against real ledger close cadence via getHealth().
+   *
+   * Deliberately uses getHealth(), not getLatestLedger(): getLatestLedger()
+   * parses a headerXdr blob through @stellar/js-xdr, which throws
+   * "XDR Read Error: unknown StellarValueType member for value 3" against
+   * real current testnet — confirmed live, not intermittent — because the
+   * pinned SDK can't decode a StellarValueType variant the network now
+   * produces. getHealth() returns the same latestLedger/close-time data as
+   * plain JSON fields, with no XDR parsing, so it isn't affected.
    *
    * Public so it can be tested in isolation.
    */
@@ -214,12 +222,17 @@ export class ContractMonitor {
       return this.options.pollingIntervalMs;
     }
 
-    const raw = await this.server.getLatestLedger();
-    if (raw.closeTime === undefined) return DEFAULT_POLL_MS;
+    const raw = await this.server.getHealth();
+    // latestLedgerCloseTime is missing from the SDK's own GetHealthResponse
+    // type despite always being present on the real response — same class
+    // of stale-.d.ts gap already fixed once for GetLatestLedgerResponse.closeTime.
+    const closeTime = (raw as rpc.Api.GetHealthResponse & { latestLedgerCloseTime?: string })
+      .latestLedgerCloseTime;
+    if (closeTime === undefined) return DEFAULT_POLL_MS;
 
     const current: LedgerSample = {
-      sequence: raw.sequence,
-      closeTimeMs: Number(raw.closeTime) * 1000,
+      sequence: raw.latestLedger,
+      closeTimeMs: Number(closeTime) * 1000,
     };
     const interval = this.computeAdaptiveIntervalMs(
       this.lastLedgerSample,
@@ -329,7 +342,7 @@ export class ContractMonitor {
 
   private async resolveStartLedger(): Promise<number> {
     if (this.options.startLedger) return this.options.startLedger;
-    const latest = await this.server.getLatestLedger();
-    return latest.sequence - 1;
+    const latest = await this.server.getHealth();
+    return latest.latestLedger - 1;
   }
 }
