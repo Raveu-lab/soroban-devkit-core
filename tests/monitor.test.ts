@@ -163,6 +163,69 @@ describe("ContractMonitor", () => {
       expect(() => monitor.stop()).not.toThrow();
     });
   });
+
+  describe("start — mid-session RPC failure", () => {
+    it("routes a schedulePoll() failure through the error callback and keeps polling, instead of dying as an unhandled rejection", async () => {
+      // runPollCycle() used to call schedulePoll() via
+      // `.finally(() => void this.schedulePoll())`, discarding the
+      // returned promise. schedulePoll() itself had no try/catch around
+      // its `await this.resolvePollingIntervalMs()` call. So a transient
+      // RPC failure mid-session (the exact kind fetchAndEmitEvents()
+      // already survives via its own .catch(emitError)) bypassed every
+      // error-reporting path this library has and became a bare
+      // unhandled promise rejection — silently killing all future polling
+      // with no "error" event ever firing.
+      jest.useFakeTimers();
+      try {
+        const monitor = new ContractMonitor("testnet");
+        monitor.watch({ contractIds: ["CTEST"] }); // no pollingIntervalMs: forces the adaptive getHealth() path
+
+        jest.spyOn(monitor.getServer(), "getEvents").mockResolvedValue({
+          events: [],
+          latestLedger: 100,
+        } as never);
+
+        const healthResponse = {
+          status: "healthy",
+          latestLedger: 100,
+          latestLedgerCloseTime: "1000",
+          oldestLedger: 1,
+          ledgerRetentionWindow: 1000,
+        };
+        const injectedError = new Error("RPC temporarily unreachable");
+        jest
+          .spyOn(monitor.getServer(), "getHealth")
+          // resolveStartLedger() in start()
+          .mockResolvedValueOnce(healthResponse as never)
+          // schedulePoll() in start()
+          .mockResolvedValueOnce(healthResponse as never)
+          // schedulePoll() from the first runPollCycle() — the failure
+          .mockRejectedValueOnce(injectedError)
+          // schedulePoll() from the next runPollCycle() — recovery
+          .mockResolvedValueOnce(healthResponse as never);
+
+        const errors: Error[] = [];
+        monitor.on("error", (err) => errors.push(err));
+
+        await monitor.start();
+        // First poll cycle: fetchAndEmitEvents (no events) → schedulePoll(),
+        // which is the mocked rejection.
+        await jest.advanceTimersByTimeAsync(5000);
+
+        expect(errors).toHaveLength(1);
+        expect(errors[0].message).toBe("RPC temporarily unreachable");
+
+        // Polling must have recovered (fallen back to DEFAULT_POLL_MS)
+        // rather than stopping silently after the failure.
+        await jest.advanceTimersByTimeAsync(5000);
+        expect(monitor.getServer().getHealth).toHaveBeenCalledTimes(4);
+
+        monitor.stop();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+  });
 });
 
 describe("ContractMonitor — additional edge cases", () => {

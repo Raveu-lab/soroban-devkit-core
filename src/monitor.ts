@@ -246,7 +246,22 @@ export class ContractMonitor {
 
   private async schedulePoll(): Promise<void> {
     if (!this.running) return;
-    const intervalMs = await this.resolvePollingIntervalMs();
+    // resolvePollingIntervalMs() makes its own RPC call (getHealth()) when
+    // no explicit pollingIntervalMs was set, so it can fail the same way
+    // fetchAndEmitEvents() can — a transient network blip mid-session, not
+    // just at startup. Catching it here, not just at the call sites below,
+    // is what lets polling recover instead of silently stopping: without
+    // this, the error bypassed emitError entirely and surfaced as a bare
+    // unhandled promise rejection (confirmed live — reproducible every
+    // time), since runPollCycle()'s `.finally()` discarded this method's
+    // returned promise.
+    let intervalMs: number;
+    try {
+      intervalMs = await this.resolvePollingIntervalMs();
+    } catch (err) {
+      this.emitError(err);
+      intervalMs = DEFAULT_POLL_MS;
+    }
     this.pollTimer = setTimeout(() => this.runPollCycle(), intervalMs);
   }
 
@@ -254,7 +269,7 @@ export class ContractMonitor {
     this.fetchAndEmitEvents()
       .catch((err) => this.emitError(err))
       .finally(() => {
-        void this.schedulePoll();
+        this.schedulePoll().catch((err) => this.emitError(err));
       });
   }
 
