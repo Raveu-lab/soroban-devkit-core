@@ -158,6 +158,18 @@ ${methods ? "\n" + methods + "\n" : ""}}
     const innerType =
       type.switch() === xdr.ScSpecType.scSpecTypeOption() ? type.option().valueType() : type;
 
+    // Same gap, one level deeper: a Vec<T> reached the default case below
+    // and the whole array went through unwrapped. ArgEncoder's own array
+    // handling then infers each element independently with no spec to
+    // consult, so a Vec<u32>'s elements got the same scvI32 default a bare
+    // u32 used to get before its hint existed — failing the same way
+    // against a real contract expecting Vec<u32>. Recursing per element
+    // means this also composes for Vec<Option<T>> and nested Vec<Vec<T>>.
+    if (innerType.switch() === xdr.ScSpecType.scSpecTypeVec()) {
+      const elementExpr = this.argExpression("v", innerType.vec().elementType());
+      return elementExpr === "v" ? argName : `${argName}.map((v) => (${elementExpr}))`;
+    }
+
     switch (innerType.switch()) {
       case xdr.ScSpecType.scSpecTypeU32():
         return `{ $u32: ${argName} }`;

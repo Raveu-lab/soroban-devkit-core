@@ -259,6 +259,44 @@ describe("BindingGenerator.buildBindings", () => {
         "this.encoder.encodeArgs([{ $u32: proposal_id }, voter, support])"
       );
     });
+
+    it("wraps each element of a Vec<u32> arg in the $u32 hint", () => {
+      // argExpression only unwrapped Option<T> to find the inner type that
+      // needs a hint — a Vec<T> fell straight to the default case and the
+      // whole array went through unwrapped. ArgEncoder's own array handling
+      // (encode()'s Array.isArray branch) then infers each element
+      // independently with no spec to consult, so a Vec<u32> element — a
+      // plain number — got the same scvI32 default a bare u32 scalar used
+      // to get before that hint existed, failing the same way against a
+      // real contract expecting Vec<u32>.
+      const vecU32 = xdr.ScSpecTypeDef.scSpecTypeVec(
+        new xdr.ScSpecTypeVec({ elementType: xdr.ScSpecTypeDef.scSpecTypeU32() })
+      );
+      const content = generator.buildBindings("CCNGT...", [func("f", [input("items", vecU32)])]);
+      expect(content).toContain(
+        "this.encoder.encodeArgs([items.map((v) => ({ $u32: v }))])"
+      );
+    });
+
+    it("wraps each element of a Vec<Timepoint> arg in the $timepoint hint", () => {
+      const vecTimepoint = xdr.ScSpecTypeDef.scSpecTypeVec(
+        new xdr.ScSpecTypeVec({ elementType: xdr.ScSpecTypeDef.scSpecTypeTimepoint() })
+      );
+      const content = generator.buildBindings("CCNGT...", [
+        func("f", [input("deadlines", vecTimepoint)]),
+      ]);
+      expect(content).toContain(
+        "this.encoder.encodeArgs([deadlines.map((v) => ({ $timepoint: v }))])"
+      );
+    });
+
+    it("does not wrap a Vec<Address> arg — the element type needs no hint", () => {
+      const vecAddr = xdr.ScSpecTypeDef.scSpecTypeVec(
+        new xdr.ScSpecTypeVec({ elementType: xdr.ScSpecTypeDef.scSpecTypeAddress() })
+      );
+      const content = generator.buildBindings("CCNGT...", [func("f", [input("signers", vecAddr)])]);
+      expect(content).toContain("this.encoder.encodeArgs([signers])");
+    });
   });
 
   it("generates one method per function, for multiple functions", () => {
