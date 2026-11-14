@@ -170,6 +170,18 @@ ${methods ? "\n" + methods + "\n" : ""}}
       return elementExpr === "v" ? argName : `${argName}.map((v) => (${elementExpr}))`;
     }
 
+    // Same gap, a different spec shape: a Soroban Tuple is encoded exactly
+    // like a Vec at the value level (ArgEncoder's encode() handles both via
+    // the same Array.isArray branch) — so each position needs its own hint
+    // the same way a Vec's elements do, rather than one hint for the whole
+    // tuple. Left as a bare pass-through only when no position needs one.
+    if (innerType.switch() === xdr.ScSpecType.scSpecTypeTuple()) {
+      const valueTypes = innerType.tuple().valueTypes();
+      const elementExprs = valueTypes.map((t, i) => this.argExpression(`${argName}[${i}]`, t));
+      const needsHint = elementExprs.some((expr, i) => expr !== `${argName}[${i}]`);
+      return needsHint ? `[${elementExprs.join(", ")}]` : argName;
+    }
+
     switch (innerType.switch()) {
       case xdr.ScSpecType.scSpecTypeU32():
         return `{ $u32: ${argName} }`;

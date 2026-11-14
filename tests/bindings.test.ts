@@ -297,6 +297,30 @@ describe("BindingGenerator.buildBindings", () => {
       const content = generator.buildBindings("CCNGT...", [func("f", [input("signers", vecAddr)])]);
       expect(content).toContain("this.encoder.encodeArgs([signers])");
     });
+
+    it("wraps a hinted element of a Tuple arg, leaving unhinted elements alone", () => {
+      // Same gap as Vec<T>, one spec type over: a Tuple value is encoded
+      // exactly like a Vec at runtime (ArgEncoder's Array.isArray branch
+      // handles both identically), so a Tuple<u32, Address> element without
+      // a hint fails the same way a bare u32 scalar used to.
+      const tuple = xdr.ScSpecTypeDef.scSpecTypeTuple(
+        new xdr.ScSpecTypeTuple({
+          valueTypes: [xdr.ScSpecTypeDef.scSpecTypeU32(), xdr.ScSpecTypeDef.scSpecTypeAddress()],
+        })
+      );
+      const content = generator.buildBindings("CCNGT...", [func("f", [input("pair", tuple)])]);
+      expect(content).toContain("this.encoder.encodeArgs([[{ $u32: pair[0] }, pair[1]]])");
+    });
+
+    it("does not wrap a Tuple arg at all when no element needs a hint", () => {
+      const tuple = xdr.ScSpecTypeDef.scSpecTypeTuple(
+        new xdr.ScSpecTypeTuple({
+          valueTypes: [xdr.ScSpecTypeDef.scSpecTypeAddress(), xdr.ScSpecTypeDef.scSpecTypeBool()],
+        })
+      );
+      const content = generator.buildBindings("CCNGT...", [func("f", [input("pair", tuple)])]);
+      expect(content).toContain("this.encoder.encodeArgs([pair])");
+    });
   });
 
   it("generates one method per function, for multiple functions", () => {
